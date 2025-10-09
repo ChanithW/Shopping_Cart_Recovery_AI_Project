@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2">
+            <div class="admin-sidebar p-3">
+                <h6 class="text-light mb-3">Admin Panel</h6>
+                <nav class="nav flex-column">
+                    <a class="nav-link active" href="{{ url_for('admin_dashboard') }}">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                    <a class="nav-link" href="{{ url_for('admin_products') }}">
+                        <i class="fas fa-box"></i> Products
+                    </a>
+                    <a class="nav-link" href="{{ url_for('admin_orders') }}">
+                        <i class="fas fa-shopping-cart"></i> Orders
+                    </a>
+                    <a class="nav-link" href="#abandoned-carts">
+                        <i class="fas fa-exclamation-triangle"></i> Abandoned Carts
+                        {% if total_abandoned > 0 %}
+                        <span class="badge bg-danger ms-2">{{ total_abandoned }}</span>
+                        {% endif %}
+                    </a>
+                    <a class="nav-link" href="/admin/customers">
+                        <i class="fas fa-users"></i> Customers
+                    </a>
+                    <a class="nav-link" href="/admin/reports">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </a>
+                    <a class="nav-link" href="/admin/settings">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <hr class="my-3">
+                    <a class="nav-link" href="{{ url_for('index') }}">
+                        <i class="fas fa-store"></i> View Store
+                    </a>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Dashboard</h2>
+                <div class="text-muted">
+                    <i class="fas fa-calendar"></i> {{ current_date }}
+                </div>
+            </div>
+            
+            <!-- Statistics Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">Total Products</h6>
+                                    <h3 class="mb-0">{{ total_products }}</h3>
+                                </div>
+                                <div class="ms-3">
+                                    <i class="fas fa-box fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">Total Orders</h6>
+                                    <h3 class="mb-0">{{ total_orders }}</h3>
+                                </div>
+                                <div class="ms-3">
+                                    <i class="fas fa-shopping-cart fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">Total Customers</h6>
+                                    <h3 class="mb-0">{{ total_users }}</h3>
+                                </div>
+                                <div class="ms-3">
+                                    <i class="fas fa-users fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">Revenue</h6>
+                                    <h3 class="mb-0">${{ "%.2f"|format(total_revenue) }}</h3>
+                                </div>
+                                <div class="ms-3">
+                                    <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Abandoned Carts Row -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">🛒 Abandoned Carts</h6>
+                                    <h3 class="mb-0">{{ total_abandoned }} Active</h3>
+                                    <small>Carts abandoned in the last 24 hours</small>
+                                </div>
+                                <div class="ms-3">
+                                    <i class="fas fa-exclamation-triangle fa-3x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-bolt"></i> Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-2">
+                                    <a href="{{ url_for('admin_add_product') }}" class="btn btn-outline-primary w-100">
+                                        <i class="fas fa-plus"></i> Add Product
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <a href="{{ url_for('admin_orders') }}" class="btn btn-outline-success w-100">
+                                        <i class="fas fa-eye"></i> View Orders
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <a href="#" class="btn btn-outline-info w-100">
+                                        <i class="fas fa-chart-line"></i> View Reports
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <a href="#" class="btn btn-outline-warning w-100">
+                                        <i class="fas fa-cog"></i> Settings
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Abandoned Carts Details -->
+            <div class="row mb-4" id="abandoned-carts">
+                <div class="col-12">
+                    <div class="card border-danger">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0"><i class="fas fa-shopping-cart"></i> Abandoned Carts - Active Now</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if abandoned_carts %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Customer</th>
+                                            <th>Email</th>
+                                            <th>Items</th>
+                                            <th>Cart Value</th>
+                                            <th>Last Activity</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for cart in abandoned_carts %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ cart.first_name }} {{ cart.last_name }}</strong>
+                                            </td>
+                                            <td>
+                                                <a href="mailto:{{ cart.email }}">{{ cart.email }}</a>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">{{ cart.items_count }} items</span>
+                                            </td>
+                                            <td>
+                                                <strong class="text-success">${{ "%.2f"|format(cart.cart_value) }}</strong>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ cart.minutes_ago }} minutes ago
+                                                </small>
+                                            </td>
+                                            <td>
+                                                {% if cart.minutes_ago > 60 %}
+                                                <span class="badge bg-danger">High Priority</span>
+                                                {% elif cart.minutes_ago > 30 %}
+                                                <span class="badge bg-warning">Medium</span>
+                                                {% else %}
+                                                <span class="badge bg-info">Recent</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle"></i> No abandoned carts at the moment! 🎉
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Cart Abandonment Email Logs -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-envelope"></i> Recent Abandonment Emails</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_emails %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Email</th>
+                                            <th>Cart Value</th>
+                                            <th>Discount</th>
+                                            <th>Sent At</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for email in recent_emails %}
+                                        <tr>
+                                            <td>{{ email.email }}</td>
+                                            <td>${{ "%.2f"|format(email.cart_value) }}</td>
+                                            <td>
+                                                <span class="badge bg-success">{{ email.discount_offered }}% OFF</span>
+                                            </td>
+                                            <td>
+                                                <small>{{ email.sent_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                            </td>
+                                            <td>
+                                                {% if email.converted %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i> Converted
+                                                </span>
+                                                {% elif email.clicked %}
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-mouse-pointer"></i> Clicked
+                                                </span>
+                                                {% elif email.opened %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-envelope-open"></i> Opened
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="fas fa-paper-plane"></i> Sent
+                                                </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-eye"></i> View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> No abandonment emails sent yet.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-clock"></i> Recent Orders</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Order ID</th>
+                                            <th>Customer</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>#ORD001</td>
+                                            <td>John Doe</td>
+                                            <td>$299.99</td>
+                                            <td><span class="badge bg-warning">Pending</span></td>
+                                            <td>2025-10-01</td>
+                                        </tr>
+                                        <tr>
+                                            <td>#ORD002</td>
+                                            <td>Jane Smith</td>
+                                            <td>$149.99</td>
+                                            <td><span class="badge bg-success">Completed</span></td>
+                                            <td>2025-10-01</td>
+                                        </tr>
+                                        <tr>
+                                            <td>#ORD003</td>
+                                            <td>Mike Johnson</td>
+                                            <td>$89.99</td>
+                                            <td><span class="badge bg-info">Processing</span></td>
+                                            <td>2025-09-30</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-center mt-3">
+                                <a href="{{ url_for('admin_orders') }}" class="btn btn-primary">View All Orders</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Low Stock Alert</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <small class="fw-bold">iPhone 14 Pro</small>
+                                        <br><small class="text-muted">Stock: 2 units</small>
+                                    </div>
+                                    <span class="badge bg-danger">Low</span>
+                                </div>
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <small class="fw-bold">Gaming Chair</small>
+                                        <br><small class="text-muted">Stock: 3 units</small>
+                                    </div>
+                                    <span class="badge bg-warning">Low</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-star"></i> Top Products</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <small class="fw-bold">Laptop Dell XPS 13</small>
+                                        <br><small class="text-muted">25 sales</small>
+                                    </div>
+                                    <span class="badge bg-primary">Hot</span>
+                                </div>
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <small class="fw-bold">Nike Air Max</small>
+                                        <br><small class="text-muted">18 sales</small>
+                                    </div>
+                                    <span class="badge bg-success">Popular</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh dashboard data every 30 seconds
+    setInterval(function() {
+        // You can implement AJAX calls here to refresh statistics
+        console.log('Refreshing dashboard data...');
+    }, 30000);
+});
+</script>
+{% endblock %}

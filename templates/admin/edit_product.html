@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Product - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2">
+            <div class="admin-sidebar p-3">
+                <h6 class="text-light mb-3">Admin Panel</h6>
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="/admin">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                    <a class="nav-link active" href="/admin/products">
+                        <i class="fas fa-box"></i> Products
+                    </a>
+                    <a class="nav-link" href="/admin/orders">
+                        <i class="fas fa-shopping-cart"></i> Orders
+                    </a>
+                    <a class="nav-link" href="/admin/customers">
+                        <i class="fas fa-users"></i> Customers
+                    </a>
+                    <a class="nav-link" href="/admin/reports">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </a>
+                    <a class="nav-link" href="/admin/settings">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <hr class="my-3">
+                    <a class="nav-link" href="/">
+                        <i class="fas fa-store"></i> View Store
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Edit Product</h2>
+                <div>
+                    <a href="/admin/view_product/{{ product.id }}" class="btn btn-info">
+                        <i class="fas fa-eye"></i> View Product
+                    </a>
+                    <a href="/admin/products" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Products
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit"></i> Edit Product: {{ product.name }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Product Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="name" name="name" 
+                                           value="{{ product.name }}" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
+                                    <textarea class="form-control" id="description" name="description" 
+                                              rows="4" required>{{ product.description }}</textarea>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="price" class="form-label">Price ($) <span class="text-danger">*</span></label>
+                                            <input type="number" step="0.01" min="0" class="form-control" 
+                                                   id="price" name="price" value="{{ product.price }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="stock" class="form-label">Stock Quantity <span class="text-danger">*</span></label>
+                                            <input type="number" min="0" class="form-control" 
+                                                   id="stock" name="stock" value="{{ product.stock }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="category" class="form-label">Category <span class="text-danger">*</span></label>
+                                            <select class="form-control" id="category" name="category" required>
+                                                <option value="Electronics" {% if product.category == 'Electronics' %}selected{% endif %}>Electronics</option>
+                                                <option value="Footwear" {% if product.category == 'Footwear' %}selected{% endif %}>Footwear</option>
+                                                <option value="Furniture" {% if product.category == 'Furniture' %}selected{% endif %}>Furniture</option>
+                                                <option value="Appliances" {% if product.category == 'Appliances' %}selected{% endif %}>Appliances</option>
+                                                <option value="Accessories" {% if product.category == 'Accessories' %}selected{% endif %}>Accessories</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <label class="form-label">Current Product Image</label>
+                                    <div class="mb-3">
+                                        <img src="{{ url_for('static', filename='images/products/' + product.image) }}" 
+                                             class="img-fluid rounded shadow" 
+                                             alt="{{ product.name }}"
+                                             style="max-width: 200px; max-height: 200px; object-fit: cover;"
+                                             onerror="this.src='{{ url_for('static', filename='images/default-product.jpg') }}'">
+                                    </div>
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i>
+                                        Image file: {{ product.image }}
+                                    </small>
+                                    <hr>
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>Note:</strong> Image upload functionality will be added in future updates. Currently using: {{ product.image }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+                        
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save"></i> Update Product
+                                </button>
+                                <button type="reset" class="btn btn-outline-secondary">
+                                    <i class="fas fa-undo"></i> Reset Changes
+                                </button>
+                            </div>
+                            <div>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock"></i> 
+                                    Product ID: {{ product.id }} | 
+                                    Created: {{ product.created_at.strftime('%Y-%m-%d') if product.created_at else 'N/A' }}
+                                </small>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+console.log('Edit product page loaded for product ID: {{ product.id }}');
+
+// Add form validation
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    
+    form.addEventListener('submit', function(e) {
+        const price = parseFloat(document.getElementById('price').value);
+        const stock = parseInt(document.getElementById('stock').value);
+        
+        if (price < 0) {
+            alert('Price cannot be negative!');
+            e.preventDefault();
+            return false;
+        }
+        
+        if (stock < 0) {
+            alert('Stock cannot be negative!');
+            e.preventDefault();
+            return false;
+        }
+        
+        // Confirm update
+        if (!confirm('Are you sure you want to update this product?')) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

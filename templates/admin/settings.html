@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2">
+            <div class="admin-sidebar p-3">
+                <h6 class="text-light mb-3">Admin Panel</h6>
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                    <a class="nav-link" href="{{ url_for('admin_products') }}">
+                        <i class="fas fa-box"></i> Products
+                    </a>
+                    <a class="nav-link" href="{{ url_for('admin_orders') }}">
+                        <i class="fas fa-shopping-cart"></i> Orders
+                    </a>
+                    <a class="nav-link" href="/admin/customers">
+                        <i class="fas fa-users"></i> Customers
+                    </a>
+                    <a class="nav-link" href="/admin/reports">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </a>
+                    <a class="nav-link active" href="/admin/settings">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <hr class="my-3">
+                    <a class="nav-link" href="{{ url_for('index') }}">
+                        <i class="fas fa-store"></i> View Store
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>System Settings</h2>
+                <div class="text-muted">
+                    <i class="fas fa-cog"></i> Administration
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- System Statistics -->
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-pie"></i> System Statistics
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="border-end">
+                                        <h3 class="text-primary">{{ stats.products }}</h3>
+                                        <small class="text-muted">Products</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border-end">
+                                        <h3 class="text-success">{{ stats.customers }}</h3>
+                                        <small class="text-muted">Customers</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <h3 class="text-info">{{ stats.orders }}</h3>
+                                    <small class="text-muted">Orders</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Site Settings -->
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-globe"></i> Site Configuration
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                <input type="hidden" name="action" value="update_site_settings">
+                                <div class="mb-3">
+                                    <label class="form-label">Site Name</label>
+                                    <input type="text" class="form-control" value="ECommerceStore" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Site URL</label>
+                                    <input type="text" class="form-control" value="http://localhost:8080" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Environment</label>
+                                    <input type="text" class="form-control" value="Production" readonly>
+                                </div>
+                                <button type="submit" class="btn btn-primary" disabled>
+                                    <i class="fas fa-save"></i> Save Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tools"></i> System Maintenance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-database fa-2x text-primary mb-3"></i>
+                                    <h6>Database Backup</h6>
+                                    <p class="text-muted small">Create a backup of your database</p>
+                                    <form method="POST" style="display: inline;">
+                                        <input type="hidden" name="action" value="backup_database">
+                                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-download"></i> Backup Now
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-broom fa-2x text-warning mb-3"></i>
+                                    <h6>Clear Cache</h6>
+                                    <p class="text-muted small">Clear application cache and temporary files</p>
+                                    <form method="POST" style="display: inline;">
+                                        <input type="hidden" name="action" value="clear_cache">
+                                        <button type="submit" class="btn btn-outline-warning btn-sm">
+                                            <i class="fas fa-trash"></i> Clear Cache
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-shield-alt fa-2x text-success mb-3"></i>
+                                    <h6>System Security</h6>
+                                    <p class="text-muted small">Security status and recommendations</p>
+                                    <button class="btn btn-outline-success btn-sm" disabled>
+                                        <i class="fas fa-check"></i> Status: Secure
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Information -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i> System Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Version:</dt>
+                                <dd class="col-sm-8">1.0.0</dd>
+                                <dt class="col-sm-4">Platform:</dt>
+                                <dd class="col-sm-8">Flask + MySQL</dd>
+                                <dt class="col-sm-4">Server:</dt>
+                                <dd class="col-sm-8">Waitress WSGI</dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Database:</dt>
+                                <dd class="col-sm-8">MySQL 8.0+</dd>
+                                <dt class="col-sm-4">Storage:</dt>
+                                <dd class="col-sm-8">Local File System</dd>
+                                <dt class="col-sm-4">Status:</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check"></i> Running
+                                    </span>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+console.log('Settings page loaded');
+
+// Add confirmation for maintenance actions
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('form[method="POST"]');
+    
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const action = form.querySelector('input[name="action"]').value;
+            
+            if (action === 'backup_database') {
+                if (!confirm('Are you sure you want to create a database backup?')) {
+                    e.preventDefault();
+                }
+            } else if (action === 'clear_cache') {
+                if (!confirm('Are you sure you want to clear the cache? This may temporarily slow down the site.')) {
+                    e.preventDefault();
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

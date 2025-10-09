@@ -1,0 +1,487 @@
+{% extends "base.html" %}
+
+{% block title %}Customers - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2">
+            <div class="admin-sidebar p-3">
+                <h6 class="text-light mb-3">Admin Panel</h6>
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                    <a class="nav-link" href="{{ url_for('admin_products') }}">
+                        <i class="fas fa-box"></i> Products
+                    </a>
+                    <a class="nav-link" href="{{ url_for('admin_orders') }}">
+                        <i class="fas fa-shopping-cart"></i> Orders
+                    </a>
+                    <a class="nav-link active" href="/admin/customers">
+                        <i class="fas fa-users"></i> Customers
+                    </a>
+                    <a class="nav-link" href="/admin/reports">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </a>
+                    <a class="nav-link" href="/admin/settings">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <hr class="my-3">
+                    <a class="nav-link" href="{{ url_for('index') }}">
+                        <i class="fas fa-store"></i> View Store
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Customer Management</h2>
+                <div class="text-muted">
+                    <i class="fas fa-users"></i> Total: {{ customers|length }} customers
+                </div>
+            </div>
+
+            <!-- Customers Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users"></i> All Customers
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if customers %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Total Orders</th>
+                                    <th>Total Spent</th>
+                                    <th>Joined</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for customer in customers %}
+                                <tr>
+                                    <td>{{ customer.id }}</td>
+                                    <td>{{ customer.name }}</td>
+                                    <td>{{ customer.email }}</td>
+                                    <td>{{ customer.phone or 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ customer.total_orders }}</span>
+                                    </td>
+                                    <td>${{ "%.2f"|format(customer.total_spent) }}</td>
+                                    <td>{{ customer.created_at.strftime('%Y-%m-%d') if customer.created_at else 'N/A' }}</td>
+                                    <td>
+                                        <button class="btn btn-outline-primary btn-sm view-details-btn" 
+                                                data-customer-id="{{ customer.id }}" 
+                                                title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info btn-sm send-email-btn" 
+                                                data-customer-id="{{ customer.id }}"
+                                                data-customer-name="{{ customer.name }}"
+                                                data-customer-email="{{ customer.email }}"
+                                                title="Send Email">
+                                            <i class="fas fa-envelope"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No customers found</h5>
+                        <p class="text-muted">Customers will appear here once they register.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Customer Details Modal -->
+<div class="modal fade" id="customerDetailsModal" tabindex="-1" aria-labelledby="customerDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="customerDetailsModalLabel">Customer Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="customerDetailsBody">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading customer details...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Send Email Modal -->
+<div class="modal fade" id="sendEmailModal" tabindex="-1" aria-labelledby="sendEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sendEmailModalLabel">Send Email</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="emailForm">
+                    <div class="mb-3">
+                        <label for="recipientName" class="form-label">To:</label>
+                        <input type="text" class="form-control" id="recipientName" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailTemplate" class="form-label">Template:</label>
+                        <select class="form-control" id="emailTemplate">
+                            <option value="">Loading templates...</option>
+                        </select>
+                        <small class="text-muted">Choose a pre-written template or select 'Custom Message' to write your own.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailSubject" class="form-label">Subject:</label>
+                        <input type="text" class="form-control" id="emailSubject" placeholder="Enter email subject" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailMessage" class="form-label">Message:</label>
+                        <textarea class="form-control" id="emailMessage" rows="8" placeholder="Enter your message" required></textarea>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <small>This will send an email using your configured email service. You can customize any template before sending.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="sendEmailBtn">
+                    <i class="fas fa-paper-plane"></i> Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Customer management functionality
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Customer management page loaded');
+    
+    // Handle view details button clicks
+    document.querySelectorAll('.view-details-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const customerId = this.getAttribute('data-customer-id');
+            loadCustomerDetails(customerId);
+        });
+    });
+    
+    // Handle send email button clicks
+    document.querySelectorAll('.send-email-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const customerId = this.getAttribute('data-customer-id');
+            const customerName = this.getAttribute('data-customer-name');
+            const customerEmail = this.getAttribute('data-customer-email');
+            openEmailModal(customerId, customerName, customerEmail);
+        });
+    });
+    
+    // Handle send email form submission
+    document.getElementById('sendEmailBtn').addEventListener('click', function() {
+        sendCustomerEmail();
+    });
+    
+    // Handle template selection
+    document.getElementById('emailTemplate').addEventListener('change', function() {
+        const templateName = this.value;
+        if (templateName) {
+            loadEmailTemplate(templateName);
+        }
+    });
+});
+
+function loadCustomerDetails(customerId) {
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('customerDetailsModal'));
+    modal.show();
+    
+    // Reset modal body to loading state
+    const modalBody = document.getElementById('customerDetailsBody');
+    modalBody.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading customer details...</p>
+        </div>
+    `;
+    
+    // Fetch customer details
+    fetch(`/admin/customer_details/${customerId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            displayCustomerDetails(data);
+        })
+        .catch(error => {
+            console.error('Error loading customer details:', error);
+            modalBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Error loading customer details: ${error.message}
+                </div>
+            `;
+        });
+}
+
+function displayCustomerDetails(data) {
+    const { customer, recent_orders, addresses } = data;
+    const modalBody = document.getElementById('customerDetailsBody');
+    
+    let ordersHtml = '';
+    if (recent_orders && recent_orders.length > 0) {
+        ordersHtml = recent_orders.map(order => `
+            <tr>
+                <td>#${order.id.substring(0, 8)}</td>
+                <td>${order.formatted_date}</td>
+                <td>$${order.total_amount ? order.total_amount.toFixed(2) : '0.00'}</td>
+                <td>
+                    <span class="badge ${order.status === 'completed' ? 'bg-success' : 
+                                      order.status === 'pending' ? 'bg-warning' : 
+                                      order.status === 'shipped' ? 'bg-info' : 'bg-secondary'}">
+                        ${order.status}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    } else {
+        ordersHtml = '<tr><td colspan="4" class="text-center text-muted">No orders found</td></tr>';
+    }
+    
+    let addressesHtml = '';
+    if (addresses && addresses.length > 0) {
+        addressesHtml = addresses.map(addr => `
+            <li class="list-group-item">
+                ${addr.address}
+            </li>
+        `).join('');
+    } else {
+        addressesHtml = '<li class="list-group-item text-muted">No address found</li>';
+    }
+    
+    modalBody.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-user"></i> Customer Information</h6>
+                <table class="table table-sm">
+                    <tr><th>Name:</th><td>${customer.name || 'N/A'}</td></tr>
+                    <tr><th>Email:</th><td>${customer.email || 'N/A'}</td></tr>
+                    <tr><th>Phone:</th><td>${customer.phone || 'N/A'}</td></tr>
+                    <tr><th>Joined:</th><td>${customer.created_at ? new Date(customer.created_at).toLocaleDateString() : 'N/A'}</td></tr>
+                    <tr><th>Total Orders:</th><td><span class="badge bg-info">${customer.total_orders || 0}</span></td></tr>
+                    <tr><th>Total Spent:</th><td><strong>$${customer.total_spent ? customer.total_spent.toFixed(2) : '0.00'}</strong></td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="fas fa-map-marker-alt"></i> Address</h6>
+                <ul class="list-group list-group-flush">
+                    ${addressesHtml}
+                </ul>
+            </div>
+        </div>
+        
+        <hr>
+        
+        <h6><i class="fas fa-shopping-cart"></i> Recent Orders</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Date</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${ordersHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function openEmailModal(customerId, customerName, customerEmail) {
+    // Store customer info for sending
+    document.getElementById('sendEmailBtn').setAttribute('data-customer-id', customerId);
+    document.getElementById('sendEmailBtn').setAttribute('data-customer-email', customerEmail);
+    
+    // Populate the form
+    document.getElementById('recipientName').value = `${customerName} (${customerEmail})`;
+    document.getElementById('emailSubject').value = '';
+    document.getElementById('emailMessage').value = '';
+    
+    // Load email templates
+    loadEmailTemplates();
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('sendEmailModal'));
+    modal.show();
+}
+
+function sendCustomerEmail() {
+    const sendBtn = document.getElementById('sendEmailBtn');
+    const customerId = sendBtn.getAttribute('data-customer-id');
+    const customerEmail = sendBtn.getAttribute('data-customer-email');
+    const subject = document.getElementById('emailSubject').value.trim();
+    const message = document.getElementById('emailMessage').value.trim();
+    
+    // Validate form
+    if (!subject || !message) {
+        alert('Please fill in both subject and message fields.');
+        return;
+    }
+    
+    // Disable button and show loading
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    
+    // Send email
+    fetch('/admin/send_customer_email', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            customer_id: customerId,
+            customer_email: customerEmail,
+            subject: subject,
+            message: message
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal and show success message
+            bootstrap.Modal.getInstance(document.getElementById('sendEmailModal')).hide();
+            
+            // Show success alert with different styling for simulated emails
+            const alertDiv = document.createElement('div');
+            const isSimulated = data.simulated;
+            alertDiv.className = `alert ${isSimulated ? 'alert-info' : 'alert-success'} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                <i class="fas ${isSimulated ? 'fa-info-circle' : 'fa-check-circle'}"></i>
+                ${data.message}
+                ${isSimulated ? '<br><small>Configure email settings in .env file to send actual emails.</small>' : ''}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Insert alert at the top of the main content
+            const mainContent = document.querySelector('.col-md-9.col-lg-10');
+            mainContent.insertBefore(alertDiv, mainContent.firstChild);
+            
+            // Auto-dismiss after 7 seconds for simulated, 5 seconds for real
+            setTimeout(() => {
+                if (alertDiv) alertDiv.remove();
+            }, isSimulated ? 7000 : 5000);
+        } else {
+            alert('Error sending email: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error sending email:', error);
+        alert('Error sending email: ' + error.message);
+    })
+    .finally(() => {
+        // Re-enable button
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Email';
+    });
+}
+
+function loadEmailTemplates() {
+    const templateSelect = document.getElementById('emailTemplate');
+    
+    // Set loading state
+    templateSelect.innerHTML = '<option value="">Loading templates...</option>';
+    
+    // Fetch templates from server
+    fetch('/admin/email_templates')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear loading option
+                templateSelect.innerHTML = '<option value="">Choose a template...</option>';
+                
+                // Add template options
+                data.templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.key;
+                    option.textContent = template.name;
+                    option.setAttribute('data-subject', template.subject);
+                    templateSelect.appendChild(option);
+                });
+            } else {
+                templateSelect.innerHTML = '<option value="">Error loading templates</option>';
+                console.error('Error loading email templates:', data.message);
+            }
+        })
+        .catch(error => {
+            templateSelect.innerHTML = '<option value="">Error loading templates</option>';
+            console.error('Error fetching email templates:', error);
+        });
+}
+
+function loadEmailTemplate(templateName) {
+    if (!templateName) return;
+    
+    // Show loading state
+    const subjectField = document.getElementById('emailSubject');
+    const messageField = document.getElementById('emailMessage');
+    
+    subjectField.value = 'Loading...';
+    messageField.value = 'Loading template...';
+    
+    // Fetch specific template
+    fetch(`/admin/email_template/${templateName}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                subjectField.value = data.template.subject;
+                messageField.value = data.template.message;
+                
+                // Focus on message field for easy editing
+                messageField.focus();
+            } else {
+                subjectField.value = '';
+                messageField.value = 'Error loading template. Please write a custom message.';
+                console.error('Error loading template:', data.message);
+            }
+        })
+        .catch(error => {
+            subjectField.value = '';
+            messageField.value = 'Error loading template. Please write a custom message.';
+            console.error('Error fetching template:', error);
+        });
+}
+</script>
+{% endblock %}

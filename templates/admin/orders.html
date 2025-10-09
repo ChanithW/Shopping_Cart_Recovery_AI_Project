@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Orders - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Admin Sidebar -->
+        <div class="col-md-3 col-lg-2">
+            <div class="admin-sidebar p-3">
+                <h6 class="text-light mb-3">Admin Panel</h6>
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                    <a class="nav-link" href="{{ url_for('admin_products') }}">
+                        <i class="fas fa-box"></i> Products
+                    </a>
+                    <a class="nav-link active" href="{{ url_for('admin_orders') }}">
+                        <i class="fas fa-shopping-cart"></i> Orders
+                    </a>
+                    <a class="nav-link" href="/admin/customers" onclick="console.log('Clicking customers:', this.href); return true;">
+                        <i class="fas fa-users"></i> Customers
+                    </a>
+                    <a class="nav-link" href="/admin/reports" onclick="console.log('Clicking reports:', this.href); return true;">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </a>
+                    <a class="nav-link" href="/admin/settings" onclick="console.log('Clicking settings:', this.href); return true;">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <hr class="my-3">
+                    <a class="nav-link" href="{{ url_for('index') }}">
+                        <i class="fas fa-store"></i> View Store
+                    </a>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Order Management</h2>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" onclick="exportOrders()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="refreshOrders()">
+                        <i class="fas fa-refresh"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Order Statistics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">{{ orders|selectattr('status', 'equalto', 'pending')|list|length }}</h3>
+                            <small>Pending Orders</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">{{ orders|selectattr('status', 'equalto', 'processing')|list|length }}</h3>
+                            <small>Processing</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">{{ orders|selectattr('status', 'equalto', 'shipped')|list|length }}</h3>
+                            <small>Shipped</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">{{ orders|selectattr('status', 'equalto', 'delivered')|list|length }}</h3>
+                            <small>Delivered</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <label for="statusFilter" class="form-label">Status</label>
+                            <select class="form-select" id="statusFilter">
+                                <option value="">All Orders</option>
+                                <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="dateFilter" class="form-label">Date Range</label>
+                            <select class="form-select" id="dateFilter">
+                                <option value="">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="searchOrder" class="form-label">Search</label>
+                            <input type="text" class="form-control" id="searchOrder" placeholder="Search by order ID or customer name...">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                                <i class="fas fa-times"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Orders Table -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Customer</th>
+                                    <th>Date</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody">
+                                {% for order in orders %}
+                                <tr data-status="{{ order.status }}" data-date="{{ order.created_at.strftime('%Y-%m-%d') }}">
+                                    <td>
+                                        <code>#{{ order.id[:8] }}...</code>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ order.user_name }}</strong>
+                                            <br><small class="text-muted">{{ order.email }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <small>
+                                            {{ order.created_at.strftime('%m/%d/%Y') }}<br>
+                                            {{ order.created_at.strftime('%I:%M %p') }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <strong>${{ "%.2f"|format(order.total_amount) }}</strong>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm status-select" 
+                                                data-order-id="{{ order.id }}" 
+                                                onchange="updateOrderStatus(this)">
+                                            <option value="pending" {{ 'selected' if order.status == 'pending' else '' }}>Pending</option>
+                                            <option value="processing" {{ 'selected' if order.status == 'processing' else '' }}>Processing</option>
+                                            <option value="shipped" {{ 'selected' if order.status == 'shipped' else '' }}>Shipped</option>
+                                            <option value="delivered" {{ 'selected' if order.status == 'delivered' else '' }}>Delivered</option>
+                                            <option value="cancelled" {{ 'selected' if order.status == 'cancelled' else '' }}>Cancelled</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if order.payment_status == 'completed' %}bg-success
+                                            {% elif order.payment_status == 'failed' %}bg-danger
+                                            {% else %}bg-warning{% endif %}">
+                                            {{ order.payment_status.title() if order.payment_status else 'Pending' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-outline-primary btn-sm" 
+                                                    onclick="viewOrderDetails('{{ order.id }}')" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-outline-success btn-sm" 
+                                                    onclick="printOrder('{{ order.id }}')" title="Print">
+                                                <i class="fas fa-print"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if orders|length == 0 %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-shopping-cart text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="text-muted mt-3">No orders found</h5>
+                        <p class="text-muted">Orders will appear here when customers place them</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade" id="orderDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Order Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="orderDetailsBody">
+                <!-- Order details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="printOrderDetails()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Notification function
+function showNotification(message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alertHtml = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
+    
+    // Auto dismiss after 5 seconds
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.textContent.includes(message)) {
+                alert.remove();
+            }
+        });
+    }, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Filter functionality
+    const statusFilter = document.getElementById('statusFilter');
+    const dateFilter = document.getElementById('dateFilter');
+    const searchOrder = document.getElementById('searchOrder');
+    
+    function filterOrders() {
+        const selectedStatus = statusFilter.value;
+        const selectedDate = dateFilter.value;
+        const searchTerm = searchOrder.value.toLowerCase();
+        const rows = document.querySelectorAll('#ordersTableBody tr');
+        
+        rows.forEach(row => {
+            const status = row.dataset.status;
+            const orderDate = new Date(row.dataset.date);
+            const orderText = row.textContent.toLowerCase();
+            
+            let showRow = true;
+            
+            // Status filter
+            if (selectedStatus && status !== selectedStatus) {
+                showRow = false;
+            }
+            
+            // Date filter
+            if (selectedDate) {
+                const today = new Date();
+                const daysDiff = Math.floor((today - orderDate) / (1000 * 60 * 60 * 24));
+                
+                if (selectedDate === 'today' && daysDiff !== 0) showRow = false;
+                if (selectedDate === 'week' && daysDiff > 7) showRow = false;
+                if (selectedDate === 'month' && daysDiff > 30) showRow = false;
+            }
+            
+            // Search filter
+            if (searchTerm && !orderText.includes(searchTerm)) {
+                showRow = false;
+            }
+            
+            row.style.display = showRow ? '' : 'none';
+        });
+    }
+    
+    statusFilter.addEventListener('change', filterOrders);
+    dateFilter.addEventListener('change', filterOrders);
+    searchOrder.addEventListener('input', filterOrders);
+});
+
+function updateOrderStatus(selectElement) {
+    const orderId = selectElement.dataset.orderId;
+    const newStatus = selectElement.value;
+    
+    fetch('/admin/update_order_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            order_id: orderId,
+            status: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Order status updated successfully', 'success');
+            // Update the row's data attribute
+            selectElement.closest('tr').dataset.status = newStatus;
+        } else {
+            showNotification(data.message || 'Error updating order status', 'error');
+            // Revert the select to previous value
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Error updating order status', 'error');
+        location.reload();
+    });
+}
+
+function viewOrderDetails(orderId) {
+    // Fetch order details via AJAX
+    fetch(`/admin/order_details/${orderId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('orderDetailsBody').innerHTML = data.html;
+            new bootstrap.Modal(document.getElementById('orderDetailsModal')).show();
+        } else {
+            showNotification(data.message || 'Error loading order details', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Error loading order details', 'error');
+    });
+}
+
+function printOrder(orderId) {
+    window.open(`/admin/print_order/${orderId}`, '_blank');
+}
+
+function printOrderDetails() {
+    const modalBody = document.getElementById('orderDetailsBody');
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Order Details</title>
+                <style>
+                    body { font-family: Arial, sans-serif; }
+                    .no-print { display: none; }
+                </style>
+            </head>
+            <body>
+                ${modalBody.innerHTML}
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+
+function exportOrders() {
+    window.location.href = '/admin/export_orders';
+}
+
+function refreshOrders() {
+    location.reload();
+}
+
+function clearFilters() {
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('dateFilter').value = '';
+    document.getElementById('searchOrder').value = '';
+    
+    // Show all rows
+    const rows = document.querySelectorAll('#ordersTableBody tr');
+    rows.forEach(row => row.style.display = '');
+}
+</script>
+{% endblock %}

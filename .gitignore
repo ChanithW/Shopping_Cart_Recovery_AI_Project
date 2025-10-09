@@ -1,0 +1,124 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+Ecom_platform/ecom/venv/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Flask
+instance/
+.webassets-cache
+*.db
+*.sqlite3
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Database
+*.sql
+*.sqlite
+*.db
+
+# Uploads
+uploads/
+static/images/products/*
+!static/images/products/.gitkeep
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# pyenv
+.python-version
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+*.lnk
+
+# Secrets & API Keys
+*.pem
+*.key
+secrets/
+credentials/
+
+# Compiled files
+*.pyc
+*.pyo
+
+# Cache
+.cache/
+*.cache
+
+# Node (if using any JS tools)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Migration scripts (temporary)
+add_cart_hash_column.py
+migrate_*.py
+
+# Email test files
+test_email.html
+test_*.py
+
+# Backup files
+*.backup
+backup/
+backups/

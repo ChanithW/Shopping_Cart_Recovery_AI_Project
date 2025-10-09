@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="mb-4">
+                <h2><i class="fas fa-credit-card text-primary"></i> Checkout</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('cart') }}">Cart</a></li>
+                        <li class="breadcrumb-item active">Checkout</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+    
+    <form method="POST" action="{{ url_for('checkout') }}" id="checkoutForm">
+        <div class="row">
+            <!-- Checkout Form -->
+            <div class="col-lg-8">
+                <!-- Shipping Information -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-truck"></i> Shipping Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="firstName" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="firstName" name="firstName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="lastName" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="lastName" name="lastName" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   value="{{ session.email }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Street Address</label>
+                            <input type="text" class="form-control" id="address" name="address" 
+                                   placeholder="123 Main Street" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="city" class="form-label">City</label>
+                                <input type="text" class="form-control" id="city" name="city" required>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="state" class="form-label">State</label>
+                                <select class="form-select" id="state" name="state" required>
+                                    <option value="">Choose...</option>
+                                    <option value="AL">Alabama</option>
+                                    <option value="CA">California</option>
+                                    <option value="FL">Florida</option>
+                                    <option value="NY">New York</option>
+                                    <option value="TX">Texas</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="zip" class="form-label">ZIP Code</label>
+                                <input type="text" class="form-control" id="zip" name="zip" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Payment Information -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-credit-card"></i> Payment Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Payment Method</label>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="paymentMethod" 
+                                               id="creditCard" value="credit_card" checked>
+                                        <label class="form-check-label" for="creditCard">
+                                            <i class="fab fa-cc-visa"></i> Credit Card
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="paymentMethod" 
+                                               id="paypal" value="paypal">
+                                        <label class="form-check-label" for="paypal">
+                                            <i class="fab fa-paypal"></i> PayPal
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="paymentMethod" 
+                                               id="cod" value="cod">
+                                        <label class="form-check-label" for="cod">
+                                            <i class="fas fa-money-bill"></i> Cash on Delivery
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="creditCardFields">
+                            <div class="mb-3">
+                                <label for="cardNumber" class="form-label">Card Number</label>
+                                <input type="text" class="form-control" id="cardNumber" name="cardNumber" 
+                                       placeholder="1234 5678 9012 3456" maxlength="19">
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="expiryMonth" class="form-label">Expiry Month</label>
+                                    <select class="form-select" id="expiryMonth" name="expiryMonth">
+                                        <option value="">Month</option>
+                                        <option value="01">01</option>
+                                        <option value="02">02</option>
+                                        <option value="03">03</option>
+                                        <option value="04">04</option>
+                                        <option value="05">05</option>
+                                        <option value="06">06</option>
+                                        <option value="07">07</option>
+                                        <option value="08">08</option>
+                                        <option value="09">09</option>
+                                        <option value="10">10</option>
+                                        <option value="11">11</option>
+                                        <option value="12">12</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="expiryYear" class="form-label">Expiry Year</label>
+                                    <select class="form-select" id="expiryYear" name="expiryYear">
+                                        <option value="">Year</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                        <option value="2027">2027</option>
+                                        <option value="2028">2028</option>
+                                        <option value="2029">2029</option>
+                                        <option value="2030">2030</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="cvv" class="form-label">CVV</label>
+                                    <input type="text" class="form-control" id="cvv" name="cvv" 
+                                           placeholder="123" maxlength="4">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cardName" class="form-label">Name on Card</label>
+                                <input type="text" class="form-control" id="cardName" name="cardName" 
+                                       placeholder="John Doe">
+                            </div>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="savePayment">
+                            <label class="form-check-label" for="savePayment">
+                                Save payment information for future purchases
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Order Summary -->
+            <div class="col-lg-4">
+                <div class="card sticky-top" style="top: 20px;">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-receipt"></i> Order Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Order Items -->
+                        <div class="order-items mb-3">
+                            {% for item in cart_items %}
+                            <div class="d-flex align-items-center mb-2 pb-2 border-bottom">
+                                <img src="{{ url_for('static', filename='images/products/' + item.image) }}" 
+                                     class="rounded me-3" width="50" height="50" alt="{{ item.name }}">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-0 small">{{ item.name }}</h6>
+                                    <small class="text-muted">Qty: {{ item.quantity }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <small class="fw-bold">${{ "%.2f"|format(item.total) }}</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Totals -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Subtotal:</span>
+                            <span>${{ "%.2f"|format(total_amount) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Shipping:</span>
+                            <span class="text-success">Free</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Tax (8%):</span>
+                            <span>${{ "%.2f"|format(total_amount * 0.08) }}</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <strong>Total:</strong>
+                            <strong class="text-primary">${{ "%.2f"|format(total_amount * 1.08) }}</strong>
+                        </div>
+                        
+                        <!-- Place Order Button -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-lock"></i> Place Order
+                            </button>
+                            <a href="{{ url_for('cart') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Cart
+                            </a>
+                        </div>
+                        
+                        <!-- Security Info -->
+                        <div class="text-center mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-shield-alt text-success"></i>
+                                Your payment information is secure and encrypted
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentMethods = document.querySelectorAll('input[name="paymentMethod"]');
+    const creditCardFields = document.getElementById('creditCardFields');
+    const cardNumber = document.getElementById('cardNumber');
+    const cvv = document.getElementById('cvv');
+    const checkoutForm = document.getElementById('checkoutForm');
+    
+    // Toggle credit card fields visibility
+    paymentMethods.forEach(method => {
+        method.addEventListener('change', function() {
+            if (this.value === 'credit_card') {
+                creditCardFields.style.display = 'block';
+                setCardFieldsRequired(true);
+            } else {
+                creditCardFields.style.display = 'none';
+                setCardFieldsRequired(false);
+            }
+        });
+    });
+    
+    function setCardFieldsRequired(required) {
+        const fields = ['cardNumber', 'expiryMonth', 'expiryYear', 'cvv', 'cardName'];
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.required = required;
+            }
+        });
+    }
+    
+    // Format card number input
+    if (cardNumber) {
+        cardNumber.addEventListener('input', function() {
+            let value = this.value.replace(/\s/g, '').replace(/[^0-9]/gi, '');
+            let formattedValue = '';
+            
+            for (let i = 0; i < value.length; i++) {
+                if (i > 0 && i % 4 === 0) {
+                    formattedValue += ' ';
+                }
+                formattedValue += value[i];
+            }
+            
+            this.value = formattedValue;
+        });
+    }
+    
+    // Restrict CVV to numbers only
+    if (cvv) {
+        cvv.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/gi, '');
+        });
+    }
+    
+    // Form submission
+    checkoutForm.addEventListener('submit', function(e) {
+        const selectedPayment = document.querySelector('input[name="paymentMethod"]:checked').value;
+        
+        if (selectedPayment === 'credit_card') {
+            // Basic card validation
+            const cardNum = document.getElementById('cardNumber').value.replace(/\s/g, '');
+            if (cardNum.length < 13 || cardNum.length > 19) {
+                e.preventDefault();
+                alert('Please enter a valid card number');
+                return;
+            }
+        }
+        
+        // Show loading state
+        const submitBtn = this.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        submitBtn.disabled = true;
+    });
+});
+</script>
+{% endblock %}

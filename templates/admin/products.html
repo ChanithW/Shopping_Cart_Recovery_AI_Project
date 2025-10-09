@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Products - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Admin Sidebar -->
+        <div class="col-md-3 col-lg-2">
+            <div class="admin-sidebar p-3">
+                <h6 class="text-light mb-3">Admin Panel</h6>
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                    <a class="nav-link active" href="{{ url_for('admin_products') }}">
+                        <i class="fas fa-box"></i> Products
+                    </a>
+                    <a class="nav-link" href="{{ url_for('admin_orders') }}">
+                        <i class="fas fa-shopping-cart"></i> Orders
+                    </a>
+                    <a class="nav-link" href="/admin/customers" onclick="console.log('Clicking customers:', this.href); return true;">
+                        <i class="fas fa-users"></i> Customers
+                    </a>
+                    <a class="nav-link" href="/admin/reports" onclick="console.log('Clicking reports:', this.href); return true;">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </a>
+                    <a class="nav-link" href="/admin/settings" onclick="console.log('Clicking settings:', this.href); return true;">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <hr class="my-3">
+                    <a class="nav-link" href="{{ url_for('index') }}">
+                        <i class="fas fa-store"></i> View Store
+                    </a>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Product Management</h2>
+                <a href="{{ url_for('admin_add_product') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add New Product
+                </a>
+            </div>
+            
+            <!-- Filters and Search -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row align-items-end">
+                        <div class="col-md-4">
+                            <label for="searchProducts" class="form-label">Search Products</label>
+                            <input type="text" class="form-control" id="searchProducts" placeholder="Search by name or category...">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="categoryFilter" class="form-label">Category</label>
+                            <select class="form-select" id="categoryFilter">
+                                <option value="">All Categories</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Footwear">Footwear</option>
+                                <option value="Furniture">Furniture</option>
+                                <option value="Appliances">Appliances</option>
+                                <option value="Accessories">Accessories</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="stockFilter" class="form-label">Stock Status</label>
+                            <select class="form-select" id="stockFilter">
+                                <option value="">All Products</option>
+                                <option value="instock">In Stock</option>
+                                <option value="lowstock">Low Stock (&lt;10)</option>
+                                <option value="outofstock">Out of Stock</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-secondary w-100" id="clearFilters">
+                                <i class="fas fa-times"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Products Table -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Image</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Price</th>
+                                    <th>Stock</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productsTableBody">
+                                {% for product in products %}
+                                <tr data-category="{{ product.category }}" data-stock="{{ product.stock }}">
+                                    <td>
+                                        <img src="{{ url_for('static', filename='images/products/' + product.image) }}" 
+                                             alt="{{ product.name }}" class="img-thumbnail" width="50" height="50"
+                                             onerror="this.src='{{ url_for('static', filename='images/default-product.jpg') }}'">
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ product.name }}</strong>
+                                            <br><small class="text-muted">{{ product.description[:50] }}...</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ product.category }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>${{ "%.2f"|format(product.price) }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if product.stock == 0 %}
+                                        <span class="badge bg-danger">Out of Stock</span>
+                                        {% elif product.stock < 10 %}
+                                        <span class="badge bg-warning">{{ product.stock }} units</span>
+                                        {% else %}
+                                        <span class="badge bg-success">{{ product.stock }} units</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if product.stock > 0 %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ product.created_at.strftime('%m/%d/%Y') if product.created_at else 'N/A' }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="/admin/edit_product/{{ product.id }}" class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="/admin/view_product/{{ product.id }}" class="btn btn-outline-info btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete({{ product.id }}, &quot;{{ product.name }}&quot;)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if products|length == 0 %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-box-open text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="text-muted mt-3">No products found</h5>
+                        <p class="text-muted">Start by adding your first product</p>
+                        <a href="{{ url_for('admin_add_product') }}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Add Product
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchProducts');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const stockFilter = document.getElementById('stockFilter');
+    const clearFilters = document.getElementById('clearFilters');
+    const tableBody = document.getElementById('productsTableBody');
+    
+    function filterProducts() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedCategory = categoryFilter.value;
+        const selectedStock = stockFilter.value;
+        const rows = tableBody.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            const name = row.cells[1].textContent.toLowerCase();
+            const category = row.dataset.category;
+            const stock = parseInt(row.dataset.stock);
+            
+            let showRow = true;
+            
+            // Search filter
+            if (searchTerm && !name.includes(searchTerm) && !category.toLowerCase().includes(searchTerm)) {
+                showRow = false;
+            }
+            
+            // Category filter
+            if (selectedCategory && category !== selectedCategory) {
+                showRow = false;
+            }
+            
+            // Stock filter
+            if (selectedStock) {
+                if (selectedStock === 'instock' && stock === 0) showRow = false;
+                if (selectedStock === 'lowstock' && (stock === 0 || stock >= 10)) showRow = false;
+                if (selectedStock === 'outofstock' && stock > 0) showRow = false;
+            }
+            
+            row.style.display = showRow ? '' : 'none';
+        });
+    }
+    
+    // Event listeners
+    searchInput.addEventListener('input', filterProducts);
+    categoryFilter.addEventListener('change', filterProducts);
+    stockFilter.addEventListener('change', filterProducts);
+    
+    clearFilters.addEventListener('click', function() {
+        searchInput.value = '';
+        categoryFilter.value = '';
+        stockFilter.value = '';
+        filterProducts();
+    });
+});
+
+function confirmDelete(productId, productName) {
+    if (confirm(`Are you sure you want to delete "${productName}"? This action cannot be undone.`)) {
+        // Implement delete functionality with better error handling
+        console.log(`Attempting to delete product ${productId}`);
+        
+        fetch(`/admin/delete_product/${productId}`, {
+            method: 'POST',  // Changed to POST for better compatibility
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            
+            if (data.success) {
+                alert(data.message || 'Product deleted successfully');
+                location.reload();
+            } else {
+                alert(data.message || 'Error deleting product');
+            }
+        })
+        .catch(error => {
+            console.error('Detailed error:', error);
+            alert(`Error deleting product: ${error.message}`);
+        });
+    }
+}
+</script>
+{% endblock %}

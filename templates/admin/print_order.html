@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order #{{ order.id }} - Print</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: white;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        .company-name {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .company-info {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .order-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .info-section {
+            flex: 1;
+        }
+        .info-section h3 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .info-row {
+            margin-bottom: 8px;
+        }
+        .label {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .items-table th,
+        .items-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        .items-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .items-table .quantity,
+        .items-table .price,
+        .items-table .total {
+            text-align: right;
+        }
+        .summary {
+            margin-top: 30px;
+            text-align: right;
+        }
+        .summary-table {
+            display: inline-block;
+            border-collapse: collapse;
+        }
+        .summary-table td {
+            padding: 5px 15px;
+            border: none;
+        }
+        .summary-table .total-row {
+            border-top: 2px solid #333;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-processing { background-color: #d1ecf1; color: #0c5460; }
+        .status-shipped { background-color: #d4edda; color: #155724; }
+        .status-delivered { background-color: #d4edda; color: #155724; }
+        .status-cancelled { background-color: #f8d7da; color: #721c24; }
+        .payment-completed { background-color: #d4edda; color: #155724; }
+        .payment-pending { background-color: #fff3cd; color: #856404; }
+        .payment-failed { background-color: #f8d7da; color: #721c24; }
+        
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">E-Commerce Store</div>
+        <div class="company-info">
+            123 Business Street, City, State 12345<br>
+            Phone: (555) 123-4567 | Email: info@ecomstore.com
+        </div>
+    </div>
+
+    <div class="order-info">
+        <div class="info-section">
+            <h3>Order Information</h3>
+            <div class="info-row">
+                <span class="label">Order ID:</span>
+                #{{ order.id }}
+            </div>
+            <div class="info-row">
+                <span class="label">Order Date:</span>
+                {{ order.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+            </div>
+            <div class="info-row">
+                <span class="label">Status:</span>
+                <span class="status-badge status-{{ order.status }}">
+                    {{ order.status.title() }}
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="label">Payment Status:</span>
+                <span class="status-badge payment-{{ order.payment_status or 'pending' }}">
+                    {{ (order.payment_status or 'pending').title() }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h3>Customer Information</h3>
+            <div class="info-row">
+                <span class="label">Name:</span>
+                {{ order.user_name }}
+            </div>
+            <div class="info-row">
+                <span class="label">Email:</span>
+                {{ order.email }}
+            </div>
+            {% if order.phone %}
+            <div class="info-row">
+                <span class="label">Phone:</span>
+                {{ order.phone }}
+            </div>
+            {% endif %}
+            {% if order.address %}
+            <div class="info-row">
+                <span class="label">Address:</span>
+                {{ order.address }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <h3>Order Items</h3>
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th>Product Name</th>
+                <th class="quantity">Quantity</th>
+                <th class="price">Unit Price</th>
+                <th class="total">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in order_items %}
+            <tr>
+                <td>{{ item.product_name }}</td>
+                <td class="quantity">{{ item.quantity }}</td>
+                <td class="price">${{ "%.2f"|format(item.price|float) }}</td>
+                <td class="total">${{ "%.2f"|format((item.quantity|float) * (item.price|float)) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="summary">
+        <table class="summary-table">
+            <tr class="total-row">
+                <td>Total Amount:</td>
+                <td>${{ "%.2f"|format(order.total_amount|float) }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="no-print" style="margin-top: 30px; text-align: center;">
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="fas fa-print"></i> Print Order
+        </button>
+        <button onclick="window.close()" class="btn btn-secondary">
+            Close Window
+        </button>
+    </div>
+
+    <script>
+        // Auto print when page loads
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

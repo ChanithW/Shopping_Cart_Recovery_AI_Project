@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Products - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <!-- Filters Sidebar -->
+        <div class="col-md-3 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter"></i> Filters
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Category Filter -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold">Category</h6>
+                        <div class="form-check">
+                            <input class="form-check-input category-filter" type="checkbox" value="Electronics" id="electronics">
+                            <label class="form-check-label" for="electronics">Electronics</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input category-filter" type="checkbox" value="Footwear" id="footwear">
+                            <label class="form-check-label" for="footwear">Footwear</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input category-filter" type="checkbox" value="Furniture" id="furniture">
+                            <label class="form-check-label" for="furniture">Furniture</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input category-filter" type="checkbox" value="Appliances" id="appliances">
+                            <label class="form-check-label" for="appliances">Appliances</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input category-filter" type="checkbox" value="Accessories" id="accessories">
+                            <label class="form-check-label" for="accessories">Accessories</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Price Filter -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold">Price Range</h6>
+                        <div class="form-check">
+                            <input class="form-check-input price-filter" type="checkbox" value="0-50" id="price1">
+                            <label class="form-check-label" for="price1">Under $50</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input price-filter" type="checkbox" value="50-100" id="price2">
+                            <label class="form-check-label" for="price2">$50 - $100</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input price-filter" type="checkbox" value="100-500" id="price3">
+                            <label class="form-check-label" for="price3">$100 - $500</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input price-filter" type="checkbox" value="500-1000" id="price4">
+                            <label class="form-check-label" for="price4">$500 - $1000</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input price-filter" type="checkbox" value="1000+" id="price5">
+                            <label class="form-check-label" for="price5">Above $1000</label>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-outline-secondary btn-sm w-100" id="clearFilters">
+                        <i class="fas fa-times"></i> Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Products Grid -->
+        <div class="col-md-9">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Products</h2>
+                <div class="d-flex align-items-center">
+                    <label for="sortBy" class="form-label me-2 mb-0">Sort by:</label>
+                    <select class="form-select" id="sortBy" style="width: auto;">
+                        <option value="newest">Newest</option>
+                        <option value="price-low">Price: Low to High</option>
+                        <option value="price-high">Price: High to Low</option>
+                        <option value="name">Name A-Z</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="mb-4">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="searchInput" placeholder="Search products...">
+                    <button class="btn btn-outline-secondary" type="button" id="searchBtn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Products Grid -->
+            <div class="row" id="productsGrid">
+                {% for product in products %}
+                <div class="col-lg-4 col-md-6 mb-4 product-item" 
+                     data-category="{{ product.category }}" 
+                     data-price="{{ product.price }}"
+                     data-name="{{ product.name.lower() }}">
+                    <div class="card product-card h-100 shadow-sm">
+                        <div class="position-relative">
+                            <img src="{{ url_for('static', filename='images/products/' + product.image) }}" 
+                                 class="card-img-top product-image" alt="{{ product.name }}"
+                                 onerror="this.src='{{ url_for('static', filename='images/default-product.jpg') }}'">
+                            {% if product.stock < 5 %}
+                            <span class="badge bg-warning position-absolute top-0 end-0 m-2">Low Stock</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <h6 class="card-title">{{ product.name }}</h6>
+                            <p class="card-text text-muted small flex-grow-1">
+                                {{ product.description[:80] }}{% if product.description|length > 80 %}...{% endif %}
+                            </p>
+                            <div class="mb-2">
+                                <span class="badge bg-secondary">{{ product.category }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-auto">
+                                <span class="h5 text-primary mb-0">${{ "%.2f"|format(product.price) }}</span>
+                                <span class="badge bg-success">{{ product.stock }} in stock</span>
+                            </div>
+                            <div class="mt-3 d-grid gap-2">
+                                <a href="{{ url_for('product_detail', id=product.id) }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View Details
+                                </a>
+                                {% if session.loggedin %}
+                                <button class="btn btn-primary btn-sm add-to-cart-btn" data-product-id="{{ product.id }}">
+                                    <i class="fas fa-cart-plus"></i> Add to Cart
+                                </button>
+                                {% else %}
+                                <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-sign-in-alt"></i> Login to Buy
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% if products|length == 0 %}
+            <div class="text-center py-5">
+                <i class="fas fa-box-open text-muted" style="font-size: 4rem;"></i>
+                <h4 class="text-muted mt-3">No products found</h4>
+                <p class="text-muted">Try adjusting your search or filters.</p>
+            </div>
+            {% endif %}
+            
+            <div id="noResults" class="text-center py-5" style="display: none;">
+                <i class="fas fa-search text-muted" style="font-size: 4rem;"></i>
+                <h4 class="text-muted mt-3">No products match your filters</h4>
+                <p class="text-muted">Try adjusting your search criteria or clearing filters.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add to cart functionality
+    const addToCartBtns = document.querySelectorAll('.add-to-cart-btn');
+    
+    addToCartBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const productId = this.getAttribute('data-product-id');
+            addToCart(productId);
+        });
+    });
+    
+    // Filter and search functionality
+    const categoryFilters = document.querySelectorAll('.category-filter');
+    const priceFilters = document.querySelectorAll('.price-filter');
+    const searchInput = document.getElementById('searchInput');
+    const sortBy = document.getElementById('sortBy');
+    const clearFilters = document.getElementById('clearFilters');
+    const productsGrid = document.getElementById('productsGrid');
+    const noResults = document.getElementById('noResults');
+    
+    function filterProducts() {
+        const selectedCategories = Array.from(categoryFilters)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+        
+        const selectedPriceRanges = Array.from(priceFilters)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+        
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const products = document.querySelectorAll('.product-item');
+        let visibleCount = 0;
+        
+        products.forEach(product => {
+            const category = product.dataset.category;
+            const price = parseFloat(product.dataset.price);
+            const name = product.dataset.name;
+            
+            let categoryMatch = selectedCategories.length === 0 || selectedCategories.includes(category);
+            let priceMatch = selectedPriceRanges.length === 0;
+            let searchMatch = searchTerm === '' || name.includes(searchTerm);
+            
+            // Check price ranges
+            if (selectedPriceRanges.length > 0) {
+                priceMatch = selectedPriceRanges.some(range => {
+                    if (range === '0-50') return price < 50;
+                    if (range === '50-100') return price >= 50 && price < 100;
+                    if (range === '100-500') return price >= 100 && price < 500;
+                    if (range === '500-1000') return price >= 500 && price < 1000;
+                    if (range === '1000+') return price >= 1000;
+                    return false;
+                });
+            }
+            
+            if (categoryMatch && priceMatch && searchMatch) {
+                product.style.display = 'block';
+                visibleCount++;
+            } else {
+                product.style.display = 'none';
+            }
+        });
+        
+        // Show/hide no results message
+        if (visibleCount === 0) {
+            productsGrid.style.display = 'none';
+            noResults.style.display = 'block';
+        } else {
+            productsGrid.style.display = 'flex';
+            noResults.style.display = 'none';
+        }
+    }
+    
+    function sortProducts() {
+        const products = Array.from(document.querySelectorAll('.product-item'));
+        const sortValue = sortBy.value;
+        
+        products.sort((a, b) => {
+            switch (sortValue) {
+                case 'price-low':
+                    return parseFloat(a.dataset.price) - parseFloat(b.dataset.price);
+                case 'price-high':
+                    return parseFloat(b.dataset.price) - parseFloat(a.dataset.price);
+                case 'name':
+                    return a.dataset.name.localeCompare(b.dataset.name);
+                case 'newest':
+                default:
+                    return 0; // Keep original order for newest
+            }
+        });
+        
+        products.forEach(product => {
+            productsGrid.appendChild(product);
+        });
+    }
+    
+    // Event listeners
+    categoryFilters.forEach(filter => {
+        filter.addEventListener('change', filterProducts);
+    });
+    
+    priceFilters.forEach(filter => {
+        filter.addEventListener('change', filterProducts);
+    });
+    
+    searchInput.addEventListener('input', filterProducts);
+    sortBy.addEventListener('change', sortProducts);
+    
+    clearFilters.addEventListener('click', function() {
+        categoryFilters.forEach(filter => filter.checked = false);
+        priceFilters.forEach(filter => filter.checked = false);
+        searchInput.value = '';
+        sortBy.value = 'newest';
+        filterProducts();
+        sortProducts();
+    });
+});
+</script>
+{% endblock %}

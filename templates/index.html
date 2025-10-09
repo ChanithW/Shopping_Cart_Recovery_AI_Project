@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Home - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section bg-primary text-white py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold">Welcome to ECommerceStore</h1>
+                <p class="lead">Discover amazing products at unbeatable prices. Shop from the comfort of your home with fast delivery and secure payments.</p>
+                <a href="{{ url_for('products') }}" class="btn btn-light btn-lg mt-3">
+                    <i class="fas fa-shopping-bag"></i> Shop Now
+                </a>
+            </div>
+            <div class="col-lg-6">
+                <img src="{{ url_for('static', filename='images/hero-image.jpg') }}" alt="Shopping" class="img-fluid rounded shadow">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row text-center">
+            <div class="col-md-4 mb-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <i class="fas fa-shipping-fast text-primary mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">Fast Shipping</h5>
+                        <p class="card-text">Get your orders delivered quickly with our express shipping options.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <i class="fas fa-lock text-primary mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">Secure Payments</h5>
+                        <p class="card-text">Shop with confidence using our secure payment gateway.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <i class="fas fa-headset text-primary mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">24/7 Support</h5>
+                        <p class="card-text">Our customer support team is always here to help you.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Featured Products Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <h2 class="text-center mb-5">Featured Products</h2>
+        <div class="row">
+            {% for product in products %}
+            <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+                <div class="card product-card h-100 shadow-sm">
+                    <img src="{{ url_for('static', filename='images/products/' + product.image) }}" 
+                         class="card-img-top product-image" alt="{{ product.name }}"
+                         onerror="this.src='{{ url_for('static', filename='images/default-product.jpg') }}'">
+                    <div class="card-body d-flex flex-column">
+                        <h6 class="card-title">{{ product.name }}</h6>
+                        <p class="card-text text-muted small flex-grow-1">{{ product.description[:50] }}...</p>
+                        <div class="d-flex justify-content-between align-items-center mt-auto">
+                            <span class="h6 text-primary mb-0">${{ "%.2f"|format(product.price) }}</span>
+                            <span class="badge bg-success">{{ product.stock }} in stock</span>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{{ url_for('product_detail', id=product.id) }}" class="btn btn-outline-primary btn-sm me-2">
+                                <i class="fas fa-eye"></i> View
+                            </a>
+                            {% if session.loggedin %}
+                            <button class="btn btn-primary btn-sm add-to-cart-btn" data-product-id="{{ product.id }}">
+                                <i class="fas fa-cart-plus"></i> Add to Cart
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        {% if products|length == 0 %}
+        <div class="text-center py-5">
+            <i class="fas fa-box-open text-muted" style="font-size: 4rem;"></i>
+            <h4 class="text-muted mt-3">No products available</h4>
+            <p class="text-muted">Check back later for new products!</p>
+        </div>
+        {% endif %}
+        
+        {% if products|length >= 8 %}
+        <div class="text-center mt-4">
+            <a href="{{ url_for('products') }}" class="btn btn-primary btn-lg">
+                View All Products <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Newsletter Section -->
+<section class="py-5 bg-dark text-white">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h3>Stay Updated</h3>
+                <p class="lead">Subscribe to our newsletter for the latest deals and product updates.</p>
+            </div>
+            <div class="col-lg-6">
+                <form class="d-flex">
+                    <input type="email" class="form-control me-2" placeholder="Enter your email">
+                    <button type="submit" class="btn btn-primary">Subscribe</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add to cart functionality
+    const addToCartBtns = document.querySelectorAll('.add-to-cart-btn');
+    
+    addToCartBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const productId = this.getAttribute('data-product-id');
+            addToCart(productId);
+        });
+    });
+});
+</script>
+{% endblock %}
