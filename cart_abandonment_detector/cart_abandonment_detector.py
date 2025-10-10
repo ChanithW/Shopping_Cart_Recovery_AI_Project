@@ -6,6 +6,7 @@ Main module with detection, email, and recommendation components.
 
 import asyncio
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 import smtplib
@@ -106,8 +107,9 @@ class RecommendationEngine:
                 desc = p.get('description') or ''
                 cat = p.get('category') or 'general'
                 name = p.get('name') or ''
-                # Repeat category and name to boost their importance
-                text = f"{name} {name} {cat} {cat} {desc}"
+                # Repeat category 4x and name 3x to SIGNIFICANTLY boost their TF-IDF importance
+                # This ensures category gets very high weight and reduces false positives from word coincidences
+                text = f"{name} {name} {name} {cat} {cat} {cat} {cat} {desc}"
                 product_texts.append(text)
             
             # Use min_df=1 to include all terms, even if they appear in only one document
@@ -151,8 +153,9 @@ class RecommendationEngine:
                 name = item.get('name', '')
                 cat = item.get('category', '')
                 desc = item.get('description', '')
-                # Repeat important terms
-                cart_texts.append(f"{name} {name} {cat} {cat} {desc}")
+                # Repeat category 4x and name 3x to match product weighting
+                # This ensures better category-based matching and fewer false positives
+                cart_texts.append(f"{name} {name} {name} {cat} {cat} {cat} {cat} {desc}")
             
             cart_text = " ".join(cart_texts)
             
@@ -162,14 +165,43 @@ class RecommendationEngine:
             # Calculate cosine similarity
             similarities = cosine_similarity(cart_vector, self.tfidf_matrix)[0]
             
+            # Extract categories from cart items for category-based filtering
+            cart_categories = set()
+            for item in cart_items:
+                cat = item.get('category', '').strip()
+                if cat:
+                    cart_categories.add(cat.lower())
+            
             # Get top similar products (excluding cart items)
+            # Prioritize products from same categories to reduce false positives
             similar_indices = []
+            same_category_matches = []
+            cross_category_matches = []
+            
             for idx in np.argsort(similarities)[::-1]:
                 product = self.products_cache[idx]
                 if product['id'] not in cart_product_ids:
-                    similar_indices.append((idx, similarities[idx]))
-                    if len(similar_indices) >= count:
-                        break
+                    product_cat = (product.get('category') or '').strip().lower()
+                    similarity_score = similarities[idx]
+                    
+                    # Boost score for same-category products (reduce false positives)
+                    if product_cat in cart_categories:
+                        # Same category gets priority
+                        same_category_matches.append((idx, similarity_score * 1.3))  # 30% boost
+                    else:
+                        # Cross-category matches (like "Air" Fryer for "Air" Jordan)
+                        # Only include if similarity is strong enough
+                        if similarity_score > 0.25:  # Higher threshold for cross-category
+                            cross_category_matches.append((idx, similarity_score))
+            
+            # Combine: prioritize same-category, then high-scoring cross-category
+            similar_indices = sorted(same_category_matches, key=lambda x: x[1], reverse=True)[:count]
+            
+            # Fill remaining slots with cross-category if needed
+            if len(similar_indices) < count:
+                remaining = count - len(similar_indices)
+                cross_category_sorted = sorted(cross_category_matches, key=lambda x: x[1], reverse=True)
+                similar_indices.extend(cross_category_sorted[:remaining])
             
             # If we don't have enough recommendations, add top-rated/recent products
             if len(similar_indices) < count:
@@ -266,6 +298,11 @@ class RecommendationEngine:
             - Focus on value and benefits
             - Don't use overly salesy language
             
+            CRITICAL: DO NOT INCLUDE ANY SIGNATURES OR CLOSINGS
+            - No "Best regards", "Sincerely", "Cheers"
+            - No "Best, [Your Name]" or placeholder names
+            - No "Thank you", "Regards", etc.
+            - Just the main message body - no closing phrases
 
             Write the message now:
             """
@@ -295,6 +332,34 @@ class RecommendationEngine:
             
             # Extract content from response
             ai_text = response.choices[0].message.content.strip()
+            
+            # Post-processing: Remove any signatures the AI might still add
+            import re
+            signature_patterns = [
+                r'Best,.*?(?:\n|$)',  # Match "Best," followed by anything until newline or end
+                r'Sincerely,.*?(?:\n|$)',
+                r'Regards,.*?(?:\n|$)',
+                r'Cheers,.*?(?:\n|$)',
+                r'Thanks,.*?(?:\n|$)',
+                r'\[Your Name\]',  # Match the placeholder exactly
+                r'Best wishes,.*?(?:\n|$)',
+                r'Warm regards,.*?(?:\n|$)',
+                r'Kind regards,.*?(?:\n|$)',
+                r'Best regards,.*?(?:\n|$)',
+                r'Yours sincerely,.*?(?:\n|$)',
+                r'Yours truly,.*?(?:\n|$)',
+                r'With best regards,.*?(?:\n|$)',
+            ]
+            
+            logger.debug(f"AI text before signature removal: {repr(ai_text)}")
+            for pattern in signature_patterns:
+                before = ai_text
+                ai_text = re.sub(pattern, '', ai_text, flags=re.IGNORECASE | re.DOTALL)
+                if before != ai_text:
+                    logger.info(f"Removed signature with pattern: {pattern}")
+            
+            ai_text = ai_text.strip()
+            logger.debug(f"AI text after signature removal: {repr(ai_text)}")
             
             logger.info(f"✅ Groq AI generated personalized content ({len(ai_text)} chars)")
             logger.info(f"Finish reason: {response.choices[0].finish_reason}")
@@ -364,7 +429,8 @@ class EmailService:
         self,
         user: Dict,
         cart_items: List[Dict],
-        cart_total: float
+        cart_total: float,
+        log_id: int = None
     ) -> Dict[str, str]:
         """
         Generate personalized email content with AI recommendations
@@ -373,6 +439,7 @@ class EmailService:
             user: User information (name, email)
             cart_items: List of cart items
             cart_total: Total cart value
+            log_id: Cart abandonment log ID for tracking
             
         Returns:
             Dictionary with 'subject', 'html', 'text' keys
@@ -403,6 +470,12 @@ class EmailService:
             # Build recommendations HTML
             recommendations_html = self._build_recommendations_html(recommendations)
             
+            # Build tracking URL with log_id parameter
+            tracking_cart_url = config.CART_URL
+            if log_id:
+                separator = '&' if '?' in tracking_cart_url else '?'
+                tracking_cart_url = f"{tracking_cart_url}{separator}email_track={log_id}&source=abandonment_email"
+            
             # Build complete email HTML
             email_html = self._build_email_html(
                 user_name=user['name'],
@@ -414,7 +487,8 @@ class EmailService:
                 free_shipping=config.FREE_SHIPPING_ENABLED,
                 ai_recommendation_text=ai_recommendation_text,
                 recommendations_html=recommendations_html,
-                cart_url=config.CART_URL
+                cart_url=tracking_cart_url,
+                log_id=log_id
             )
             
             # Build plain text version
@@ -425,7 +499,7 @@ class EmailService:
                 discount_message=discount_message,
                 discounted_total=discounted_total,
                 recommendations=recommendations,
-                cart_url=config.CART_URL
+                cart_url=tracking_cart_url
             )
             
             subject = f"🛒 {user['name']}, you left something in your cart!"
@@ -682,6 +756,21 @@ class EmailService:
                     <!-- Recommendations Section -->
                     {('<tr><td style="padding: 30px; background: #f8f9fa;"><h3 style="margin: 0 0 20px; color: #1a1a1a; font-size: 22px; font-weight: 700; text-align: center;">✨ You Might Also Love...</h3><div style="padding: 10px;">' + kwargs['recommendations_html'] + '</div></td></tr>' if kwargs.get('recommendations_html') else '')}
                     
+                    <!-- Company Signature -->
+                    <tr>
+                        <td style="padding: 30px; background: #fff; border-top: 1px solid #eee; text-align: left;">
+                            <div style="color: #555; font-size: 16px; margin-bottom: 10px;">
+                                <strong>Thank you for shopping with us!</strong>
+                            </div>
+                            <div style="color: #333; font-size: 16px; margin-bottom: 5px;">
+                                <strong>The ECommerceStore Team</strong>
+                            </div>
+                            <div style="color: #888; font-size: 14px;">
+                                Need help? Contact us at <a href="mailto:support@ecommerce.com" style="color: #667eea; text-decoration: none;">support@ecommerce.com</a>
+                            </div>
+                        </td>
+                    </tr>
+                    
                     <!-- Social Proof -->
                     <tr>
                         <td style="padding: 30px; background: #fff; border-top: 1px solid #eee; text-align: center;">
@@ -714,6 +803,9 @@ class EmailService:
             </td>
         </tr>
     </table>
+    
+    <!-- Email Open Tracking Pixel -->
+    {('<img src="' + config.BASE_URL + '/track/email/' + str(kwargs.get('log_id', 0)) + '" width="1" height="1" style="display:none;" alt="" />') if kwargs.get('log_id') else ''}
     
 </body>
 </html>
@@ -836,6 +928,17 @@ class CartAbandonmentDetector:
     Main detector class that monitors carts and triggers abandonment recovery
     """
     
+    _instance = None  # Singleton instance
+    _instance_lock = threading.Lock()  # Thread lock for singleton
+    
+    def __new__(cls, *args, **kwargs):
+        """Implement singleton pattern to prevent multiple instances"""
+        if cls._instance is None:
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+    
     def __init__(self, mail_app=None, flask_app=None):
         """
         Initialize the detector
@@ -844,11 +947,18 @@ class CartAbandonmentDetector:
             mail_app: Flask-Mail instance (optional)
             flask_app: Flask application instance (for app context)
         """
+        # Only initialize once (singleton pattern)
+        if hasattr(self, '_initialized') and self._initialized:
+            logger.info("CartAbandonmentDetector already initialized, skipping re-initialization")
+            return
+            
         self.email_service = EmailService(mail_app, flask_app)
         self.flask_app = flask_app
         self.processed_carts = set()  # Track processed cart IDs
         self.running = False
+        self._initialized = True
         self._ensure_tracking_table()  # Create tracking table if it doesn't exist
+        logger.info("CartAbandonmentDetector initialized (singleton instance)")
     
     def _ensure_tracking_table(self):
         """Ensure the cart_abandonment_log table exists with cart_hash column"""
@@ -864,6 +974,13 @@ class CartAbandonmentDetector:
                     cart_hash VARCHAR(64) NOT NULL DEFAULT '',
                     cart_total DECIMAL(10, 2) NOT NULL,
                     email_sent BOOLEAN DEFAULT FALSE,
+                    email_opened BOOLEAN DEFAULT FALSE,
+                    link_clicked BOOLEAN DEFAULT FALSE,
+                    purchase_completed BOOLEAN DEFAULT FALSE,
+                    opened_at TIMESTAMP NULL,
+                    clicked_at TIMESTAMP NULL,
+                    completed_at TIMESTAMP NULL,
+                    click_count INT DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_user_hash_created (user_id, cart_hash, created_at),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -884,6 +1001,30 @@ class CartAbandonmentDetector:
                 # Add cart_hash column if it doesn't exist
                 cursor.execute('ALTER TABLE cart_abandonment_log ADD COLUMN cart_hash VARCHAR(64) NOT NULL DEFAULT "" AFTER user_id')
                 logger.info("Added cart_hash column to cart_abandonment_log table")
+            
+            # Check and add tracking columns if they don't exist
+            tracking_columns = [
+                ('email_opened', 'BOOLEAN DEFAULT FALSE AFTER email_sent'),
+                ('link_clicked', 'BOOLEAN DEFAULT FALSE AFTER email_opened'),
+                ('purchase_completed', 'BOOLEAN DEFAULT FALSE AFTER link_clicked'),
+                ('opened_at', 'TIMESTAMP NULL AFTER purchase_completed'),
+                ('clicked_at', 'TIMESTAMP NULL AFTER opened_at'),
+                ('completed_at', 'TIMESTAMP NULL AFTER clicked_at'),
+                ('click_count', 'INT DEFAULT 0 AFTER completed_at')
+            ]
+            
+            for col_name, col_definition in tracking_columns:
+                cursor.execute(f"""
+                    SELECT COUNT(*) as col_count
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'cart_abandonment_log' 
+                    AND COLUMN_NAME = '{col_name}'
+                """)
+                col_check = cursor.fetchone()
+                if col_check and col_check['col_count'] == 0:
+                    cursor.execute(f'ALTER TABLE cart_abandonment_log ADD COLUMN {col_name} {col_definition}')
+                    logger.info(f"Added {col_name} column to cart_abandonment_log table")
             
             conn.commit()
             cursor.close()
@@ -913,28 +1054,26 @@ class CartAbandonmentDetector:
             # Calculate abandonment threshold
             threshold_time = datetime.now() - timedelta(minutes=config.ABANDONMENT_THRESHOLD_MINUTES)
             
-            # Find abandoned carts
+            # Find abandoned carts - get unique users with abandoned items
             query = """
                 SELECT 
-                    c.id as cart_id,
                     c.user_id,
-                    c.created_at,
+                    MIN(c.created_at) as created_at,
                     u.name,
-                    u.email,
-                    GROUP_CONCAT(c.id) as cart_item_ids
+                    u.email
                 FROM cart c
                 JOIN users u ON c.user_id = u.id
                 WHERE c.created_at <= %s
                 AND c.user_id NOT IN (
                     SELECT DISTINCT user_id 
                     FROM orders 
-                    WHERE created_at > c.created_at
+                    WHERE created_at > %s
                 )
                 GROUP BY c.user_id, u.name, u.email
                 HAVING COUNT(*) > 0
             """
             
-            cursor.execute(query, (threshold_time,))
+            cursor.execute(query, (threshold_time, threshold_time))
             abandoned_carts = cursor.fetchall()
             
             logger.info(f"Found {len(abandoned_carts)} potentially abandoned carts")
@@ -971,21 +1110,36 @@ class CartAbandonmentDetector:
                     logger.debug(f"Skipping cart {cart_key} - already processed in this session")
                     continue
                 
-                # Check if email was already sent for THIS SPECIFIC CART in the last 24 hours (database check)
+                # Check if email was already sent for THIS SPECIFIC CART (same contents) in the last 24 hours
+                # If cart changes (different hash), a new email can be sent
                 cursor.execute("""
-                    SELECT COUNT(*) as email_count
+                    SELECT id, email_sent, created_at 
                     FROM cart_abandonment_log
                     WHERE user_id = %s 
                     AND cart_hash = %s
-                    AND email_sent = TRUE
                     AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                    ORDER BY created_at DESC
+                    LIMIT 1
                 """, (cart_info['user_id'], cart_hash))
                 
-                email_check = cursor.fetchone()
-                if email_check and email_check['email_count'] > 0:
-                    logger.info(f"Skipping cart {cart_hash[:8]}... for user {cart_info['user_id']} - email already sent for this cart within last 24 hours")
-                    self.processed_carts.add(cart_key)  # Add to processed to avoid checking again
-                    continue
+                existing_log = cursor.fetchone()
+                if existing_log:
+                    if existing_log['email_sent']:
+                        logger.info(f"Skipping cart {cart_hash[:8]}... for user {cart_info['user_id']} - email already sent for this exact cart within last 24 hours")
+                        self.processed_carts.add(cart_key)
+                        continue
+                    else:
+                        # Log exists but email not sent - check if it's recent (within 2 minutes)
+                        # This prevents duplicate processing if previous attempt is still in progress
+                        time_diff = datetime.now() - existing_log['created_at']
+                        if time_diff.total_seconds() < 120:  # 2 minutes
+                            logger.info(f"Skipping cart {cart_hash[:8]}... for user {cart_info['user_id']} - processing already in progress")
+                            self.processed_carts.add(cart_key)
+                            continue
+                
+                # Mark as processed IMMEDIATELY to prevent duplicate processing in same cycle
+                self.processed_carts.add(cart_key)
+                logger.debug(f"Marked cart {cart_key} as processed")
                 
                 # Calculate total
                 cart_total = sum(float(item['total']) for item in cart_items)
@@ -996,12 +1150,16 @@ class CartAbandonmentDetector:
                     'email': cart_info['email']
                 }
                 
-                # Generate and send email
+                # Log to database first to get the log_id for tracking
+                log_id = self._log_abandonment_event(cursor, cart_info['user_id'], cart_hash, cart_total, email_sent=False)
+                
+                # Generate and send email with tracking log_id
                 try:
                     email_content = await self.email_service.generate_email_content(
                         user=user,
                         cart_items=cart_items,
-                        cart_total=cart_total
+                        cart_total=cart_total,
+                        log_id=log_id
                     )
                     
                     success = await self.email_service.send_email(
@@ -1012,13 +1170,23 @@ class CartAbandonmentDetector:
                     )
                     
                     if success:
-                        self.processed_carts.add(cart_key)
-                        logger.info(f"Sent abandonment email to {user['email']} for cart worth ${cart_total:.2f} (cart hash: {cart_hash[:8]}...)")
+                        # Update the log entry to mark email as sent
+                        cursor.execute("""
+                            UPDATE cart_abandonment_log 
+                            SET email_sent = TRUE 
+                            WHERE id = %s
+                        """, (log_id,))
+                        cursor.connection.commit()
                         
-                        # Log to database with cart hash to prevent duplicates for this specific cart
-                        self._log_abandonment_event(cursor, cart_info['user_id'], cart_hash, cart_total, success)
+                        logger.info(f"Sent abandonment email to {user['email']} for cart worth ${cart_total:.2f} (log_id: {log_id}, cart hash: {cart_hash[:8]}...)")
+                    else:
+                        # If email failed to send, remove from processed set so it can be retried
+                        self.processed_carts.discard(cart_key)
+                        logger.warning(f"Failed to send email to {user['email']}, will retry next cycle")
                     
                 except Exception as e:
+                    # If error occurred, remove from processed set so it can be retried
+                    self.processed_carts.discard(cart_key)
                     logger.error(f"Error processing cart for user {cart_info['user_id']}: {e}")
             
             cursor.close()
@@ -1031,12 +1199,18 @@ class CartAbandonmentDetector:
         """Log abandonment event to database with cart hash for duplicate prevention"""
         try:
             # Insert log entry with cart hash
+            # The duplicate check is now done before calling this function
             cursor.execute("""
                 INSERT INTO cart_abandonment_log (user_id, cart_hash, cart_total, email_sent)
                 VALUES (%s, %s, %s, %s)
             """, (user_id, cart_hash, cart_total, email_sent))
             
             cursor.connection.commit()
+            
+            # Get the inserted ID
+            log_id = cursor.lastrowid
+            logger.info(f"Logged abandonment event: user_id={user_id}, cart_hash={cart_hash[:8]}..., log_id={log_id}")
+            return log_id
             
         except Exception as e:
             logger.error(f"Error logging abandonment event: {e}")

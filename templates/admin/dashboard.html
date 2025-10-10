@@ -253,7 +253,6 @@
                                         <tr>
                                             <th>Email</th>
                                             <th>Cart Value</th>
-                                            <th>Discount</th>
                                             <th>Sent At</th>
                                             <th>Status</th>
                                             <th>Actions</th>
@@ -265,21 +264,18 @@
                                             <td>{{ email.email }}</td>
                                             <td>${{ "%.2f"|format(email.cart_value) }}</td>
                                             <td>
-                                                <span class="badge bg-success">{{ email.discount_offered }}% OFF</span>
-                                            </td>
-                                            <td>
                                                 <small>{{ email.sent_at.strftime('%Y-%m-%d %H:%M') }}</small>
                                             </td>
                                             <td>
-                                                {% if email.converted %}
+                                                {% if email.converted or email.purchase_completed %}
                                                 <span class="badge bg-success">
                                                     <i class="fas fa-check"></i> Converted
                                                 </span>
-                                                {% elif email.clicked %}
+                                                {% elif email.clicked or email.link_clicked %}
                                                 <span class="badge bg-info">
                                                     <i class="fas fa-mouse-pointer"></i> Clicked
                                                 </span>
-                                                {% elif email.opened %}
+                                                {% elif email.opened or email.email_opened %}
                                                 <span class="badge bg-warning">
                                                     <i class="fas fa-envelope-open"></i> Opened
                                                 </span>

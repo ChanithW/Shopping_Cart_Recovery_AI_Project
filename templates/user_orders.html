@@ -75,7 +75,8 @@
                             <i class="fas fa-eye"></i> View Details
                         </button>
                         {% if order.status in ['pending', 'processing'] %}
-                        <button class="btn btn-outline-danger btn-sm">
+                        <button class="btn btn-outline-danger btn-sm cancel-order-btn" 
+                                data-order-id="{{ order.id }}">
                             <i class="fas fa-times"></i> Cancel
                         </button>
                         {% endif %}
@@ -204,21 +205,51 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Add click handlers for action buttons
-    const cancelBtns = document.querySelectorAll('.btn-outline-danger');
-    const reorderBtns = document.querySelectorAll('.btn-outline-secondary');
+    // Handle cancel order buttons
+    const cancelBtns = document.querySelectorAll('.cancel-order-btn');
     
     cancelBtns.forEach(btn => {
-        if (btn.textContent.includes('Cancel')) {
-            btn.addEventListener('click', function() {
-                if (confirm('Are you sure you want to cancel this order?')) {
-                    // Implement cancel order functionality
-                    showNotification('Order cancellation request submitted', 'info');
-                }
-            });
-        }
+        btn.addEventListener('click', function() {
+            const orderId = this.getAttribute('data-order-id');
+            
+            if (confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+                // Disable button to prevent double clicks
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling...';
+                
+                // Send cancel request
+                fetch(`/cancel_order/${orderId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Order cancelled successfully', 'success');
+                        // Reload the page after a short delay to show updated order list
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showNotification(data.message || 'Failed to cancel order', 'error');
+                        this.disabled = false;
+                        this.innerHTML = '<i class="fas fa-times"></i> Cancel';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('An error occurred while cancelling the order', 'error');
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-times"></i> Cancel';
+                });
+            }
+        });
     });
     
+    // Handle reorder buttons
+    const reorderBtns = document.querySelectorAll('.btn-outline-secondary');
     reorderBtns.forEach(btn => {
         if (btn.textContent.includes('Reorder')) {
             btn.addEventListener('click', function() {

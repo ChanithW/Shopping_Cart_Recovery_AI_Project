@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, make_response
 from flask_mysqldb import MySQL
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -236,6 +236,25 @@ def cart():
         flash('Please login first!', 'error')
         return redirect(url_for('login'))
     
+    # Track email click if coming from abandonment email
+    email_track_id = request.args.get('email_track')
+    if email_track_id:
+        try:
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            # Update the cart_abandonment_log to track the click
+            cursor.execute("""
+                UPDATE cart_abandonment_log 
+                SET link_clicked = TRUE, 
+                    clicked_at = NOW(),
+                    click_count = click_count + 1
+                WHERE id = %s AND user_id = %s
+            """, (email_track_id, session['id']))
+            mysql.connection.commit()
+            cursor.close()
+            logger.info(f"Tracked email click: log_id={email_track_id}, user_id={session['id']}")
+        except Exception as e:
+            logger.error(f"Error tracking email click: {e}")
+    
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('''
         SELECT c.*, p.name, p.price, p.image, (c.quantity * p.price) as total
@@ -338,6 +357,22 @@ def checkout():
             # Clear cart
             cursor.execute('DELETE FROM cart WHERE user_id = %s', (session['id'],))
             
+            # Track conversion if user came from abandonment email
+            cursor.execute("""
+                UPDATE cart_abandonment_log 
+                SET purchase_completed = TRUE,
+                    completed_at = NOW()
+                WHERE user_id = %s 
+                AND email_sent = TRUE
+                AND purchase_completed = FALSE
+                AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (session['id'],))
+            
+            if cursor.rowcount > 0:
+                logger.info(f"Tracked conversion for user {session['id']} from abandonment email")
+            
             mysql.connection.commit()
             cursor.close()
             
@@ -368,6 +403,47 @@ def order_success(order_id):
     
     return render_template('order_success.html', order=order)
 
+@app.route('/track/email/<int:log_id>')
+def track_email_open(log_id):
+    """Track email opens with a 1x1 transparent pixel"""
+    try:
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute("""
+            UPDATE cart_abandonment_log 
+            SET email_opened = TRUE,
+                opened_at = COALESCE(opened_at, NOW())
+            WHERE id = %s AND email_opened = FALSE
+        """, (log_id,))
+        mysql.connection.commit()
+        cursor.close()
+        
+        if cursor.rowcount > 0:
+            logger.info(f"Tracked email open: log_id={log_id}")
+        
+        # Return a 1x1 transparent GIF pixel
+        from io import BytesIO
+        import base64
+        
+        # 1x1 transparent GIF
+        gif_data = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+        
+        response = make_response(gif_data)
+        response.headers['Content-Type'] = 'image/gif'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error tracking email open: {e}")
+        # Still return the pixel even on error
+        from io import BytesIO
+        import base64
+        gif_data = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+        response = make_response(gif_data)
+        response.headers['Content-Type'] = 'image/gif'
+        return response
+
 @app.route('/orders')
 def user_orders():
     if not is_logged_in():
@@ -380,6 +456,48 @@ def user_orders():
     cursor.close()
     
     return render_template('user_orders.html', orders=orders)
+
+@app.route('/cancel_order/<order_id>', methods=['POST'])
+def cancel_order(order_id):
+    if not is_logged_in():
+        return jsonify({'success': False, 'message': 'Please login first'}), 401
+    
+    try:
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # Verify the order belongs to the user and is cancellable
+        cursor.execute('''
+            SELECT id, status FROM orders 
+            WHERE id = %s AND user_id = %s
+        ''', (order_id, session['id']))
+        
+        order = cursor.fetchone()
+        
+        if not order:
+            cursor.close()
+            return jsonify({'success': False, 'message': 'Order not found'}), 404
+        
+        # Only allow cancellation of pending or processing orders
+        if order['status'] not in ['pending', 'processing']:
+            cursor.close()
+            return jsonify({'success': False, 'message': f'Cannot cancel order with status: {order["status"]}'}), 400
+        
+        # Update order status to cancelled
+        cursor.execute('''
+            UPDATE orders 
+            SET status = 'cancelled'
+            WHERE id = %s
+        ''', (order_id,))
+        
+        mysql.connection.commit()
+        cursor.close()
+        
+        logger.info(f"Order {order_id} cancelled by user {session['id']}")
+        return jsonify({'success': True, 'message': 'Order cancelled successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error cancelling order: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred while cancelling the order'}), 500
 
 # Admin routes
 @app.route('/admin')
@@ -454,6 +572,29 @@ def admin_dashboard():
         ''')
         abandoned_carts_raw = cursor.fetchall()
         
+        # Get recent abandonment emails from cart_abandonment_log
+        cursor.execute('''
+            SELECT 
+                cal.id,
+                u.email,
+                cal.cart_total as cart_value,
+                cal.created_at as sent_at,
+                15 as discount_offered,
+                cal.email_opened as opened,
+                cal.link_clicked as clicked,
+                cal.purchase_completed as converted,
+                cal.click_count,
+                cal.opened_at,
+                cal.clicked_at,
+                cal.completed_at
+            FROM cart_abandonment_log cal
+            JOIN users u ON cal.user_id = u.id
+            WHERE cal.email_sent = TRUE
+            ORDER BY cal.created_at DESC
+            LIMIT 10
+        ''')
+        recent_emails = cursor.fetchall()
+        
         # Process abandoned carts data to split name into first and last
         abandoned_carts = []
         for cart in abandoned_carts_raw:
@@ -482,7 +623,8 @@ def admin_dashboard():
                              current_date=current_date,
                              recent_orders=recent_orders,
                              low_stock=low_stock,
-                             abandoned_carts=abandoned_carts)
+                             abandoned_carts=abandoned_carts,
+                             recent_emails=recent_emails)
     except Exception as e:
         app.logger.error(f"Admin dashboard error: {str(e)}")
         flash(f'Error loading admin dashboard: {str(e)}', 'error')
@@ -613,7 +755,7 @@ def admin_delete_product(product_id):
         if order_count > 0:
             cursor.close()
             app.logger.warning(f"Cannot delete product {product_id} - has {order_count} orders")
-            return jsonify({'success': False, 'message': 'Cannot delete product with existing orders. Consider marking it as out of stock instead.'}), 400
+            return jsonify({'success': False, 'message': f'Cannot delete product with existing orders ({order_count} orders found). This product is part of order history.'}), 400
         
         # Check if product is in any carts
         cursor.execute('SELECT COUNT(*) as count FROM cart WHERE product_id = %s', (product_id,))
@@ -744,6 +886,7 @@ def admin_orders():
         SELECT o.*, u.name as user_name, u.email 
         FROM orders o 
         JOIN users u ON o.user_id = u.id 
+        WHERE o.status != 'cancelled'
         ORDER BY o.created_at DESC
     ''')
     orders = cursor.fetchall()
