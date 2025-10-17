@@ -720,7 +720,7 @@ def admin_edit_product(product_id):
         flash('Product not found!', 'error')
         return redirect(url_for('admin_products'))
     
-    # Convert decimal price to float
+    # Convert decimal prices to float
     if product['price']:
         product['price'] = float(product['price'])
     
