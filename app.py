@@ -208,7 +208,17 @@ def add_to_cart():
         cursor.close()
         return jsonify({'success': False, 'message': 'Product not available'})
     
+    # Check if item already in cart
+    cursor.execute('SELECT * FROM cart WHERE user_id = %s AND product_id = %s', 
+                   (session['id'], product_id))
+    cart_item = cursor.fetchone()
     
+
+    
+    mysql.connection.commit()
+    cursor.close()
+    
+    return jsonify({'success': True, 'message': 'Added to cart successfully'})
 
 @app.route('/cart')
 def cart():
