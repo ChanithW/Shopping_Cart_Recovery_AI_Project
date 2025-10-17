@@ -51,13 +51,6 @@ Tracks all sent abandonment recovery emails:
 | **Status**     | Email engagement level        |
 | **Actions**    | View email details (future)   |
 
-**Email Status Badges:**
-
-- ✅ **Converted** (Green) - Customer completed purchase
-- 👆 **Clicked** (Blue) - Customer clicked email link
-- 📧 **Opened** (Yellow) - Customer opened email
-- ✈️ **Sent** (Gray) - Email sent, no engagement yet
-
 ## Database Queries
 
 ### Abandoned Carts Detection
