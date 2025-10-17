@@ -45,6 +45,16 @@ logger = logging.getLogger(__name__)
 class DatabaseConnection:
     """Manages MySQL database connections"""
     
+    @staticmethod
+    def get_connection():
+        """Create and return a MySQL connection"""
+        return MySQLdb.connect(
+            host=config.MYSQL_HOST,
+            user=config.MYSQL_USER,
+            password=config.MYSQL_PASSWORD,
+            database=config.MYSQL_DB,
+            cursorclass=MySQLdb.cursors.DictCursor
+        )
 
 
 class RecommendationEngine:
