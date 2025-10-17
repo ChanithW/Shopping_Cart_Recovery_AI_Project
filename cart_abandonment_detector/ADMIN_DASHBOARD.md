@@ -1,51 +1,58 @@
 # Admin Dashboard - Abandoned Carts Feature
 
 ## Overview
+
 The admin dashboard now displays real-time abandoned cart information and email campaign tracking.
 
 ## Features Added
 
 ### 1. Abandoned Carts Statistics Card
+
 - **Location:** Top of dashboard
 - **Shows:** Total number of active abandoned carts
 - **Color:** Red (high priority indicator)
 - **Updates:** Automatically with each page refresh
 
 ### 2. Sidebar Navigation
+
 - **New Link:** "Abandoned Carts" with badge showing count
 - **Badge Color:** Red (danger) - only shows when carts exist
 - **Quick Access:** Jumps directly to abandoned carts section
 
 ### 3. Active Abandoned Carts Table
+
 Displays detailed information about current abandoned carts:
 
-| Column | Description |
-|--------|-------------|
-| **Customer** | First and last name of the customer |
-| **Email** | Clickable mailto: link |
-| **Items** | Number of items in cart (badge) |
-| **Cart Value** | Total value of abandoned cart |
-| **Last Activity** | Minutes since last cart update |
-| **Status** | Priority level based on time |
+| Column            | Description                         |
+| ----------------- | ----------------------------------- |
+| **Customer**      | First and last name of the customer |
+| **Email**         | Clickable mailto: link              |
+| **Items**         | Number of items in cart (badge)     |
+| **Cart Value**    | Total value of abandoned cart       |
+| **Last Activity** | Minutes since last cart update      |
+| **Status**        | Priority level based on time        |
 
 **Status Badges:**
+
 - 🔴 **High Priority** - Abandoned > 60 minutes ago
-- ⚠️ **Medium** - Abandoned 30-60 minutes ago  
+- ⚠️ **Medium** - Abandoned 30-60 minutes ago
 - 🔵 **Recent** - Abandoned < 30 minutes ago
 
 ### 4. Recent Abandonment Emails Table
+
 Tracks all sent abandonment recovery emails:
 
-| Column | Description |
-|--------|-------------|
-| **Email** | Recipient email address |
+| Column         | Description                   |
+| -------------- | ----------------------------- |
+| **Email**      | Recipient email address       |
 | **Cart Value** | Value of cart when email sent |
-| **Discount** | Percentage discount offered |
-| **Sent At** | Timestamp of email send |
-| **Status** | Email engagement level |
-| **Actions** | View email details (future) |
+| **Discount**   | Percentage discount offered   |
+| **Sent At**    | Timestamp of email send       |
+| **Status**     | Email engagement level        |
+| **Actions**    | View email details (future)   |
 
 **Email Status Badges:**
+
 - ✅ **Converted** (Green) - Customer completed purchase
 - 👆 **Clicked** (Blue) - Customer clicked email link
 - 📧 **Opened** (Yellow) - Customer opened email
@@ -54,8 +61,9 @@ Tracks all sent abandonment recovery emails:
 ## Database Queries
 
 ### Abandoned Carts Detection
+
 ```sql
-SELECT 
+SELECT
     c.user_id,
     u.first_name,
     u.last_name,
@@ -67,7 +75,7 @@ SELECT
 FROM cart c
 JOIN users u ON c.user_id = u.id
 JOIN products p ON c.product_id = p.id
-LEFT JOIN orders o ON c.user_id = o.user_id 
+LEFT JOIN orders o ON c.user_id = o.user_id
     AND o.created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
 WHERE o.id IS NULL
 AND c.updated_at < DATE_SUB(NOW(), INTERVAL 1 MINUTE)
@@ -77,8 +85,9 @@ LIMIT 10
 ```
 
 ### Email Campaign Tracking
+
 ```sql
-SELECT 
+SELECT
     cal.id,
     cal.user_id,
     u.email,
@@ -123,7 +132,7 @@ The dashboard pulls data from the cart abandonment detection system running in t
 3. **Time Since Last Activity** - Urgency indicator
 4. **Email Performance:**
    - Send rate
-   - Open rate  
+   - Open rate
    - Click rate
    - Conversion rate
 
@@ -147,12 +156,14 @@ The dashboard pulls data from the cart abandonment detection system running in t
 ## Troubleshooting
 
 **No abandoned carts showing:**
+
 - Check if users have items in cart
 - Verify cart hasn't been updated in last minute
 - Ensure no orders placed in last 24 hours
 - Check database connection
 
 **Emails not tracked:**
+
 - Verify `cart_abandonment_log` table exists
 - Check email sending is successful
 - Review logs: `logs/cart_abandonment.log`
@@ -160,6 +171,7 @@ The dashboard pulls data from the cart abandonment detection system running in t
 ## Support
 
 For issues or questions, check:
+
 - Main documentation: `cart_abandonment_detector/README.md`
 - System logs: `cart_abandonment_detector/logs/`
 - Test suite: `cart_abandonment_detector/test_detector.py`
