@@ -966,7 +966,7 @@ class CartAbandonmentDetector:
             conn = DatabaseConnection.get_connection()
             cursor = conn.cursor()
             
-            # Create table if it doesn't exist
+            # Create table if it doesn't exists
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS cart_abandonment_log (
                     id INT AUTO_INCREMENT PRIMARY KEY,
