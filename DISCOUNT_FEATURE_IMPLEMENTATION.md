@@ -119,10 +119,4 @@ Total:        $450.00
    - Same breakdown shown
    - Order total includes discount
 
-6. **Order Placed**
-   - Order saved with discounted price (`$800.00`)
-   - Conversion tracked in `cart_abandonment_log`
-   - Discount cleared from session
-
-## Session Management
 
