@@ -493,31 +493,3 @@ GROUP BY tier;
 
 ## Architecture Benefits
 
-### Why This Design?
-
-1. **Modular:**
-   - Each component independent
-   - Easy to test
-   - Easy to extend
-
-2. **Async:**
-   - Non-blocking operations
-   - Scales to many carts
-   - Efficient resource usage
-
-3. **Fault-tolerant:**
-   - Graceful degradation
-   - Continues on errors
-   - Comprehensive logging
-
-4. **AI-Enhanced:**
-   - Gemini makes emails more engaging
-   - TF-IDF ensures relevant recommendations
-   - Personalized content increases conversion
-
-5. **Production-ready:**
-   - Configurable
-   - Testable
-   - Monitorable
-   - Secure
-
