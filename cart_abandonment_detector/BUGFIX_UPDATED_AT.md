@@ -11,7 +11,7 @@ The SQL queries in the admin dashboard were using `c.updated_at` column, but the
 - `created_at` (timestamp when item was added to cart)
 - No `updated_at` column
 
-## Database Schema (database.sql)
+## Database Schemas (database.sql)
 ```sql
 CREATE TABLE cart (
     id INT AUTO_INCREMENT PRIMARY KEY,
