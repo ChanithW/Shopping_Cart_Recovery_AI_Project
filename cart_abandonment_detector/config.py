@@ -10,7 +10,7 @@ load_dotenv()
 ABANDONMENT_THRESHOLD_MINUTES = 1  # 1 minute inactivity
 CHECK_INTERVAL_SECONDS = 30  # Check every 30 seconds
 
-# Discount Settings
+# Discount Settings :
 DISCOUNT_TIER_1_AMOUNT = 100  # $100+ gets 10% discount
 DISCOUNT_TIER_1_PERCENT = 10
 
