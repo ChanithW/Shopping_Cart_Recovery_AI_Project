@@ -126,7 +126,3 @@ Total:        $450.00
 
 ## Session Management
 
-**Session Variables**:
-- `session['discount_percent']`: Discount percentage (e.g., 20)
-- `session['discount_log_id']`: Cart abandonment log ID for conversion tracking
-
