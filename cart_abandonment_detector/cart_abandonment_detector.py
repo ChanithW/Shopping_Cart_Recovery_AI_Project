@@ -330,7 +330,7 @@ class RecommendationEngine:
                 top_p=0.9
             )
             
-            # Extract content from response
+            # Extract contents from response
             ai_text = response.choices[0].message.content.strip()
             
             # Post-processing- Remove any signatures the AI might still add
