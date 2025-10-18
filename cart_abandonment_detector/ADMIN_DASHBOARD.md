@@ -32,7 +32,7 @@ Displays detailed information about current abandoned carts:
 | **Last Activity** | Minutes since last cart update      |
 | **Status**        | Priority level based on time        |
 
-**Status Badges:**
+**Status Badges :**
 
 - 🔴 **High Priority** - Abandoned > 60 minutes ago
 - ⚠️ **Medium** - Abandoned 30-60 minutes ago
