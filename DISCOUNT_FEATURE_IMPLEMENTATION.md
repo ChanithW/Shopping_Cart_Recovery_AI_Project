@@ -100,11 +100,6 @@ Total:        $450.00
    - "Complete Your Purchase Now" button includes discount in URL
    - URL: `/cart?email_track=123&discount=20&source=abandonment_email`
 
-3. **User Clicks Button**
-   - App retrieves discount from database via `email_track` ID
-   - Stores discount in session for persistence
-   - Cart page shows discount breakdown
-
 
    ```
 
