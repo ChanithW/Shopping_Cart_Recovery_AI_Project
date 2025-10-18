@@ -172,12 +172,4 @@ CREATE TABLE cart_abandonment_log (
 
 ## Example Scenarios
 
-### Scenario 1: $150 Cart (10% Discount)
-- Cart Total: $150.00
-- Discount: 10% = -$15.00
-- Final Total: $135.00
-- Email: "Save 10% on your $150 order!"
-
-
-
 
