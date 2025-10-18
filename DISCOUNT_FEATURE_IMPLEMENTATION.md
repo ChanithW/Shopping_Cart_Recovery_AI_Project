@@ -95,11 +95,6 @@ Total:        $450.00
    - Calculates discount based on cart total (0%, 10%, or 20%)
    - Stores discount in `cart_abandonment_log.discount_offered`
 
-2. **Email Sent**
-   - Email shows discounted price: `$1,000 → $800 (20% OFF)`
-   - "Complete Your Purchase Now" button includes discount in URL
-   - URL: `/cart?email_track=123&discount=20&source=abandonment_email`
-
 
    ```
 
