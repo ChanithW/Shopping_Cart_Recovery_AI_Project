@@ -178,36 +178,6 @@ CREATE TABLE cart_abandonment_log (
 - Final Total: $135.00
 - Email: "Save 10% on your $150 order!"
 
-### Scenario 2: $600 Cart (20% Discount)
-- Cart Total: $600.00
-- Discount: 20% = -$120.00
-- Final Total: $480.00
-- Email: "Save 20% on your $600 order!"
 
-### Scenario 3: $80 Cart (No Discount)
-- Cart Total: $80.00
-- Discount: 0%
-- Final Total: $80.00
-- Email: No discount mentioned, just reminder
 
-## Benefits
 
-1. **Increased Conversions**: Incentivizes users to complete abandoned purchases
-2. **Tiered Discounts**: Rewards higher-value carts with better discounts
-3. **Tracked Effectiveness**: Admin can see which discount levels convert best
-4. **Persistent**: Discount follows user from email → cart → checkout
-5. **Accurate Orders**: Order total correctly reflects discounted price
-6. **User-Friendly**: Clear breakdown shows savings
-
-## Files Modified
-
-1. ✅ `cart_abandonment_detector/cart_abandonment_detector.py`
-2. ✅ `app.py` (cart and checkout routes)
-3. ✅ `templates/cart.html`
-4. ✅ `templates/checkout.html`
-5. ✅ `migrations/add_discount_to_cart_abandonment_log.sql`
-6. ✅ `migrations/run_discount_migration.py`
-
-## Migration Complete! 🎉
-
-The discount feature is now fully implemented and ready to use. When users click "Complete your purchase now" from abandonment emails, they'll see the discounted price throughout the entire checkout flow.
