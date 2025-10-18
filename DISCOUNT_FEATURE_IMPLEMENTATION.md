@@ -157,18 +157,6 @@ CREATE TABLE cart_abandonment_log (
 );
 ```
 
-## Testing Checklist
-
-- [x] Database migration applied successfully
-- [x] Discount calculated correctly based on cart total
-- [x] Discount stored in cart_abandonment_log
-- [x] Discount passed in email tracking URL
-- [x] Cart page displays discount correctly
-- [x] Checkout page displays discount correctly
-- [x] Order total reflects discount
-- [x] Session persists discount between cart and checkout
-- [x] Admin dashboard shows actual discount offered
-- [x] Conversion tracking works with discount
 
 
 
