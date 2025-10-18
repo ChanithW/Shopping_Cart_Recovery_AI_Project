@@ -114,9 +114,3 @@ Total:        $450.00
    Total:           $800.00
    ```
 
-5. **Checkout Page**
-   - Discount persists from session
-   - Same breakdown shown
-   - Order total includes discount
-
-
