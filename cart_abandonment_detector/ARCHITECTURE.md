@@ -443,25 +443,6 @@ SELECT
 FROM cart_abandonment_log
 GROUP BY DATE(created_at);
 
--- Recovery rate
-SELECT 
-    COUNT(*) as emails_sent,
-    COUNT(CASE WHEN email_sent THEN 1 END) as successful,
-    -- Join with orders to see conversions
-FROM cart_abandonment_log;
-
--- Average cart value by tier
-SELECT 
-    CASE 
-        WHEN cart_total >= 500 THEN '20% tier'
-        WHEN cart_total >= 100 THEN '10% tier'
-        ELSE 'No discount'
-    END as tier,
-    AVG(cart_total) as avg_cart,
-    COUNT(*) as count
-FROM cart_abandonment_log
-GROUP BY tier;
-``'
 
 
 
