@@ -84,14 +84,18 @@
                         <span>Shipping:</span>
                         <span class="text-success">Free</span>
                     </div>
+                    {% if discount_percent > 0 %}
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Tax:</span>
-                        <span id="tax">${{ "%.2f"|format(total_amount * 0.08) }}</span>
+                        <span class="text-success">
+                            <i class="fas fa-tag"></i> Discount ({{ discount_percent|int }}%):
+                        </span>
+                        <span class="text-success">-${{ "%.2f"|format(discount_amount) }}</span>
                     </div>
+                    {% endif %}
                     <hr>
                     <div class="d-flex justify-content-between mb-3">
                         <strong>Total:</strong>
-                        <strong id="total" class="text-primary">${{ "%.2f"|format(total_amount * 1.08) }}</strong>
+                        <strong id="total" class="text-primary">${{ "%.2f"|format(final_total if discount_percent > 0 else total_amount) }}</strong>
                     </div>
                     
                     <div class="d-grid gap-2">
