@@ -336,7 +336,7 @@ class RecommendationEngine:
             # Post-processing- Remove any signatures the AI might still add
             import re
             signature_patterns = [
-                r'Best,.*?(?:\n|$)',  # Match "Best," followed by anything until newline or end
+                r'Best,.*?(?:\n|$)',  # Match "Best" followed by anything until newline or end
                 r'Sincerely,.*?(?:\n|$)',
                 r'Regards,.*?(?:\n|$)',
                 r'Cheers,.*?(?:\n|$)',
