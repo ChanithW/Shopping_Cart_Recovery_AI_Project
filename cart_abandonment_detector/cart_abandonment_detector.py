@@ -333,7 +333,7 @@ class RecommendationEngine:
             # Extract content from response
             ai_text = response.choices[0].message.content.strip()
             
-            # Post-processing: Remove any signatures the AI might still add
+            # Post-processing- Remove any signatures the AI might still add
             import re
             signature_patterns = [
                 r'Best,.*?(?:\n|$)',  # Match "Best," followed by anything until newline or end
