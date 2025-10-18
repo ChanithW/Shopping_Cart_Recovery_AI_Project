@@ -170,6 +170,5 @@ CREATE TABLE cart_abandonment_log (
 - [x] Admin dashboard shows actual discount offered
 - [x] Conversion tracking works with discount
 
-## Example Scenarios
 
 
