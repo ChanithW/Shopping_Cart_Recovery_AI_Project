@@ -9,7 +9,6 @@ import os
 from datetime import datetime
 import uuid
 from email_templates import get_template, get_template_list
-import threading
 
 app = Flask(__name__)
 
@@ -41,164 +40,6 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 mysql = MySQL(app)
 mail = Mail(app)
-
-# Thread-local storage for database connections
-_thread_local = threading.local()
-
-# Context manager for fresh database connections (eliminates stale connection issues)
-from contextlib import contextmanager
-
-@contextmanager
-def get_db_connection():
-    """
-    Context manager that creates a FRESH database connection per request.
-    This eliminates 'bytearray index out of range' errors from stale connections.
-    Connection is automatically closed after use.
-    """
-    import mysql.connector as mysql_conn
-    conn = None
-    cursor = None
-    
-    try:
-        # Try Flask-MySQL first
-        if mysql is not None and hasattr(mysql, 'connection') and mysql.connection:
-            try:
-                cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-                yield cursor
-                mysql.connection.commit()
-                return
-            except Exception as e:
-                app.logger.warning(f"Flask-MySQL failed, using fallback: {e}")
-                if cursor:
-                    cursor.close()
-        
-        # Create fresh mysql.connector connection
-        conn = mysql_conn.connect(
-            host=app.config['MYSQL_HOST'],
-            user=app.config['MYSQL_USER'],
-            password=app.config['MYSQL_PASSWORD'],
-            database=app.config['MYSQL_DB'],
-            autocommit=True
-        )
-        cursor = conn.cursor(dictionary=True, buffered=True)
-        yield cursor
-        
-    except Exception as ex:
-        app.logger.error(f"Database connection failed: {ex}")
-        raise
-    finally:
-        # Cleanup: close cursor and connection
-        if cursor:
-            try:
-                cursor.close()
-            except:
-                pass
-        if conn:
-            try:
-                conn.close()
-            except:
-                pass
-
-# Legacy function for backward compatibility (will be gradually replaced)
-def get_db_cursor(dict_cursor=True):
-    """
-    Creates fresh connection and stores in thread-local storage to prevent garbage collection.
-    Connection stays alive for the duration of the request.
-    """
-    import mysql.connector as mysql_conn
-    
-    # Try Flask-MySQL first
-    try:
-        if mysql is not None and hasattr(mysql, 'connection') and mysql.connection:
-            if dict_cursor:
-                return mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-            return mysql.connection.cursor()
-    except Exception as e:
-        app.logger.warning(f"Flask-MySQL cursor failed: {e}")
-    
-    # Create fresh connection and store in thread-local to prevent garbage collection
-    try:
-        conn = mysql_conn.connect(
-            host=app.config['MYSQL_HOST'],
-            user=app.config['MYSQL_USER'],
-            password=app.config['MYSQL_PASSWORD'],
-            database=app.config['MYSQL_DB'],
-            autocommit=True
-        )
-        
-        # Store connection in thread-local storage to keep it alive
-        if not hasattr(_thread_local, 'connections'):
-            _thread_local.connections = []
-        _thread_local.connections.append(conn)
-        
-        if dict_cursor:
-            return conn.cursor(dictionary=True, buffered=True)
-        return conn.cursor(buffered=True)
-    except Exception as ex:
-        app.logger.error(f"Database connection failed: {ex}")
-        raise
-
-# Clean up thread-local connections after each request
-@app.after_request
-def cleanup_connections(response):
-    """Close thread-local database connections after each request"""
-    if hasattr(_thread_local, 'connections'):
-        for conn in _thread_local.connections:
-            try:
-                conn.close()
-            except:
-                pass
-        _thread_local.connections = []
-    return response
-
-@app.before_request
-def track_user_activity():
-    """
-    Track user activity for true idle detection.
-    Updates last_activity timestamp on every page request.
-    This enables accurate cart abandonment detection (idle users only).
-    """
-    # Only track if user is logged in
-    if 'id' in session and 'loggedin' in session:
-        try:
-            # Use a separate quick connection for activity tracking
-            import mysql.connector
-            conn = mysql.connector.connect(
-                host=app.config['MYSQL_HOST'],
-                user=app.config['MYSQL_USER'],
-                password=app.config['MYSQL_PASSWORD'],
-                database=app.config['MYSQL_DB'],
-                autocommit=True
-            )
-            cursor = conn.cursor()
-            
-            # Update last_activity timestamp
-            cursor.execute(
-                'UPDATE users SET last_activity = NOW() WHERE id = %s',
-                (session['id'],)
-            )
-            
-            cursor.close()
-            conn.close()
-            
-            # IMPORTANT: Log to console to verify it's working
-            print(f"✅ ACTIVITY TRACKED: User {session['id']} at {datetime.now()}")
-            app.logger.info(f"Activity tracked for user {session['id']} on {request.path}")
-            
-        except Exception as e:
-            # Don't break the request if activity tracking fails
-            print(f"❌ ACTIVITY TRACKING FAILED: {e}")
-            app.logger.warning(f"Failed to track user activity: {e}")
-
-def db_commit():
-    """Safely commit database changes - handles Flask-MySQL connections"""
-    global mysql
-    try:
-        if mysql is not None and hasattr(mysql, 'connection') and mysql.connection:
-            mysql.connection.commit()
-        # Note: mysql.connector connections use autocommit=True, so no manual commit needed
-    except Exception as e:
-        app.logger.warning(f"Commit warning (may already be autocommit): {e}")
 
 # Cart Abandonment Detector Integration
 from cart_abandonment_detector import CartAbandonmentDetector
@@ -240,7 +81,7 @@ def is_admin():
 
 @app.route('/')
 def index():
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM products WHERE stock > 0 ORDER BY created_at DESC LIMIT 12')
     products = cursor.fetchall()
     
@@ -257,31 +98,21 @@ def login():
         email = request.form['email']
         password = request.form['password']
         
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
         user = cursor.fetchone()
-        
-        # Debug logging
-        app.logger.info(f"Login attempt for: {email}")
-        app.logger.info(f"User found: {user is not None}")
-        
-        if user:
-            app.logger.info(f"User role: {user.get('role', 'N/A')}")
-            password_match = check_password_hash(user['password'], password)
-            app.logger.info(f"Password match: {password_match}")
-            
-            if password_match:
-                session['loggedin'] = True
-                session['id'] = user['id']
-                session['email'] = user['email']
-                session['name'] = user['name']
-                session['role'] = user['role']
-                cursor.close()
-                flash('Logged in successfully!', 'success')
-                return redirect(url_for('index'))
-        
         cursor.close()
-        flash('Invalid email or password!', 'error')
+        
+        if user and check_password_hash(user['password'], password):
+            session['loggedin'] = True
+            session['id'] = user['id']
+            session['email'] = user['email']
+            session['name'] = user['name']
+            session['role'] = user['role']
+            flash('Logged in successfully!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid email or password!', 'error')
     
     return render_template('login.html')
 
@@ -303,7 +134,7 @@ def register():
             flash('Invalid email address!', 'error')
             return render_template('register.html')
         
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
         account = cursor.fetchone()
         
@@ -313,7 +144,7 @@ def register():
             hashed_password = generate_password_hash(password)
             cursor.execute('INSERT INTO users (name, email, password, phone, address) VALUES (%s, %s, %s, %s, %s)', 
                          (name, email, hashed_password, phone, address))
-            db_commit()
+            mysql.connection.commit()
             flash('You have successfully registered!', 'success')
             return redirect(url_for('login'))
         
@@ -330,71 +161,9 @@ def logout():
     session.pop('role', None)
     return redirect(url_for('index'))
 
-
-@app.route('/profile')
-def profile():
-    """Render the user's profile page with basic details."""
-    if not is_logged_in():
-        flash('Please login to view your profile', 'error')
-        return redirect(url_for('login'))
-
-    # Fetch user details from database to ensure fresh data
-    cursor = get_db_cursor(dict_cursor=True)
-    cursor.execute('SELECT id, name, email, phone, address, created_at FROM users WHERE id = %s', (session['id'],))
-    user = cursor.fetchone()
-    cursor.close()
-
-    # If user not found (shouldn't happen), redirect to home
-    if not user:
-        flash('User not found', 'error')
-        return redirect(url_for('index'))
-
-    # Convert any datetimes to string for template
-    if isinstance(user.get('created_at'), datetime):
-        user['created_at'] = user['created_at'].strftime('%Y-%m-%d')
-
-    return render_template('profile.html', user=user)
-
-
-@app.route('/delete_account', methods=['POST'])
-def delete_account():
-    """Delete the currently logged-in user's account and associated basic details.
-
-    This endpoint requires the user to be logged in. It deletes the user row from the
-    `users` table, clears the session, and redirects to the home page with a flash
-    message. Any DB exceptions are handled gracefully with a flash and a redirect
-    back to the profile page.
-    """
-    if not is_logged_in():
-        flash('Please login to perform this action', 'error')
-        return redirect(url_for('login'))
-
-    user_id = session.get('id')
-    try:
-        cursor = get_db_cursor(dict_cursor=True)
-        # Delete user row. If you have related tables with foreign keys, consider
-        # CASCADE or deleting related rows first depending on your schema.
-        cursor.execute('DELETE FROM users WHERE id = %s', (user_id,))
-        db_commit()
-        cursor.close()
-
-        # Clear session and inform the user
-        session.pop('loggedin', None)
-        session.pop('id', None)
-        session.pop('email', None)
-        session.pop('name', None)
-        session.pop('role', None)
-
-        flash('Your account has been deleted successfully.', 'success')
-        return redirect(url_for('index'))
-    except Exception as e:
-        app.logger.error(f"Failed to delete user {user_id}: {e}")
-        flash('An error occurred while deleting your account. Please try again later.', 'error')
-        return redirect(url_for('profile'))
-
 @app.route('/products')
 def products():
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM products WHERE stock > 0')
     products = cursor.fetchall()
     
@@ -407,7 +176,7 @@ def products():
 
 @app.route('/product/<int:id>')
 def product_detail(id):
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM products WHERE id = %s', (id,))
     product = cursor.fetchone()
     cursor.close()
@@ -429,7 +198,7 @@ def add_to_cart():
     product_id = request.json.get('product_id')
     quantity = request.json.get('quantity', 1)
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
     # Check if product exists and has enough stock
     cursor.execute('SELECT * FROM products WHERE id = %s', (product_id,))
@@ -456,9 +225,7 @@ def add_to_cart():
         cursor.execute('INSERT INTO cart (user_id, product_id, quantity) VALUES (%s, %s, %s)', 
                       (session['id'], product_id, quantity))
     
-    # Commit changes (using db_commit helper)
-    db_commit()
-    
+    mysql.connection.commit()
     cursor.close()
     
     return jsonify({'success': True, 'message': 'Added to cart successfully'})
@@ -471,13 +238,10 @@ def cart():
     
     # Track email click if coming from abandonment email
     email_track_id = request.args.get('email_track')
-    discount_percent = 0
-    discount_amount = 0
-    
     if email_track_id:
         try:
-            cursor = get_db_cursor(dict_cursor=True)
-            # Update the cart_abandonment_log to track the click and get discount
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            # Update the cart_abandonment_log to track the click
             cursor.execute("""
                 UPDATE cart_abandonment_log 
                 SET link_clicked = TRUE, 
@@ -485,30 +249,13 @@ def cart():
                     click_count = click_count + 1
                 WHERE id = %s AND user_id = %s
             """, (email_track_id, session['id']))
-            
-            # Get the discount percentage from the log
-            cursor.execute("""
-                SELECT discount_offered 
-                FROM cart_abandonment_log 
-                WHERE id = %s AND user_id = %s
-            """, (email_track_id, session['id']))
-            result = cursor.fetchone()
-            if result:
-                discount_percent = float(result['discount_offered'])
-                # Store discount in session for checkout
-                session['discount_percent'] = discount_percent
-                session['discount_log_id'] = email_track_id
-            
-            db_commit()
+            mysql.connection.commit()
             cursor.close()
-            logger.info(f"Tracked email click: log_id={email_track_id}, user_id={session['id']}, discount={discount_percent}%")
+            logger.info(f"Tracked email click: log_id={email_track_id}, user_id={session['id']}")
         except Exception as e:
             logger.error(f"Error tracking email click: {e}")
-    else:
-        # Check if there's a discount in session from previous email click
-        discount_percent = session.get('discount_percent', 0)
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('''
         SELECT c.*, p.name, p.price, p.image, (c.quantity * p.price) as total
         FROM cart c 
@@ -523,35 +270,9 @@ def cart():
         item['total'] = float(item['total'])
     
     total_amount = float(sum(item['total'] for item in cart_items))
-    
-    # Calculate discount amount
-    if discount_percent > 0:
-        discount_amount = total_amount * (discount_percent / 100)
-    
     cursor.close()
     
-    return render_template('cart.html', 
-                         cart_items=cart_items, 
-                         total_amount=total_amount,
-                         discount_percent=discount_percent,
-                         discount_amount=discount_amount,
-                         final_total=total_amount - discount_amount)
-
-@app.route('/api/cart/count')
-def cart_count():
-    """API endpoint to get cart item count"""
-    if not is_logged_in():
-        return jsonify({'count': 0})
-    
-    try:
-        cursor = get_db_cursor(dict_cursor=True)
-        cursor.execute('SELECT COUNT(*) as count FROM cart WHERE user_id = %s', (session['id'],))
-        result = cursor.fetchone()
-        cursor.close()
-        return jsonify({'count': result['count'] if result else 0})
-    except Exception as e:
-        app.logger.error(f"Error getting cart count: {e}")
-        return jsonify({'count': 0})
+    return render_template('cart.html', cart_items=cart_items, total_amount=total_amount)
 
 @app.route('/update_cart', methods=['POST'])
 def update_cart():
@@ -564,10 +285,10 @@ def update_cart():
     if quantity <= 0:
         return remove_from_cart()
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('UPDATE cart SET quantity = %s WHERE id = %s AND user_id = %s', 
                    (quantity, cart_id, session['id']))
-    db_commit()
+    mysql.connection.commit()
     cursor.close()
     
     return jsonify({'success': True, 'message': 'Cart updated successfully'})
@@ -579,9 +300,9 @@ def remove_from_cart():
     
     cart_id = request.json.get('cart_id')
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('DELETE FROM cart WHERE id = %s AND user_id = %s', (cart_id, session['id']))
-    db_commit()
+    mysql.connection.commit()
     cursor.close()
     
     return jsonify({'success': True, 'message': 'Item removed from cart'})
@@ -593,7 +314,7 @@ def checkout():
         return redirect(url_for('login'))
     
     try:
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('''
             SELECT c.*, p.name, p.price, p.stock, p.image, (c.quantity * p.price) as total
             FROM cart c 
@@ -613,21 +334,13 @@ def checkout():
         
         total_amount = float(sum(item['total'] for item in cart_items))
         
-        # Get discount from session (set when user clicked email link)
-        discount_percent = session.get('discount_percent', 0)
-        discount_amount = 0
-        if discount_percent > 0:
-            discount_amount = total_amount * (discount_percent / 100)
-        
-        final_total = total_amount - discount_amount
-        
         if request.method == 'POST':
-            # Create order with discount applied
+            # Create order
             order_id = str(uuid.uuid4())
             cursor.execute('''
                 INSERT INTO orders (id, user_id, total_amount, status) 
                 VALUES (%s, %s, %s, %s)
-            ''', (order_id, session['id'], final_total, 'pending'))
+            ''', (order_id, session['id'], total_amount, 'pending'))
             
             # Add order items and update stock
             for item in cart_items:
@@ -645,49 +358,29 @@ def checkout():
             cursor.execute('DELETE FROM cart WHERE user_id = %s', (session['id'],))
             
             # Track conversion if user came from abandonment email
-            discount_log_id = session.get('discount_log_id')
-            if discount_log_id:
-                cursor.execute("""
-                    UPDATE cart_abandonment_log 
-                    SET purchase_completed = TRUE,
-                        completed_at = NOW()
-                    WHERE id = %s AND user_id = %s
-                """, (discount_log_id, session['id']))
-                logger.info(f"Tracked conversion for user {session['id']} from abandonment email (log_id: {discount_log_id})")
-                
-                # Clear discount from session after purchase
-                session.pop('discount_percent', None)
-                session.pop('discount_log_id', None)
-            else:
-                # Fallback: Track most recent abandonment email if no specific log_id
-                cursor.execute("""
-                    UPDATE cart_abandonment_log 
-                    SET purchase_completed = TRUE,
-                        completed_at = NOW()
-                    WHERE user_id = %s 
-                    AND email_sent = TRUE
-                    AND purchase_completed = FALSE
-                    AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """, (session['id'],))
+            cursor.execute("""
+                UPDATE cart_abandonment_log 
+                SET purchase_completed = TRUE,
+                    completed_at = NOW()
+                WHERE user_id = %s 
+                AND email_sent = TRUE
+                AND purchase_completed = FALSE
+                AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (session['id'],))
             
             if cursor.rowcount > 0:
                 logger.info(f"Tracked conversion for user {session['id']} from abandonment email")
             
-            db_commit()
+            mysql.connection.commit()
             cursor.close()
             
             flash('Order placed successfully!', 'success')
             return redirect(url_for('order_success', order_id=order_id))
         
         cursor.close()
-        return render_template('checkout.html', 
-                             cart_items=cart_items, 
-                             total_amount=total_amount,
-                             discount_percent=discount_percent,
-                             discount_amount=discount_amount,
-                             final_total=final_total)
+        return render_template('checkout.html', cart_items=cart_items, total_amount=total_amount)
         
     except Exception as e:
         app.logger.error(f"Checkout error: {str(e)}")
@@ -699,7 +392,7 @@ def order_success(order_id):
     if not is_logged_in():
         return redirect(url_for('login'))
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM orders WHERE id = %s AND user_id = %s', (order_id, session['id']))
     order = cursor.fetchone()
     cursor.close()
@@ -714,14 +407,14 @@ def order_success(order_id):
 def track_email_open(log_id):
     """Track email opens with a 1x1 transparent pixel"""
     try:
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute("""
             UPDATE cart_abandonment_log 
             SET email_opened = TRUE,
                 opened_at = COALESCE(opened_at, NOW())
             WHERE id = %s AND email_opened = FALSE
         """, (log_id,))
-        db_commit()
+        mysql.connection.commit()
         cursor.close()
         
         if cursor.rowcount > 0:
@@ -757,7 +450,7 @@ def user_orders():
         flash('Please login first!', 'error')
         return redirect(url_for('login'))
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM orders WHERE user_id = %s ORDER BY created_at DESC', (session['id'],))
     orders = cursor.fetchall()
     cursor.close()
@@ -770,7 +463,7 @@ def cancel_order(order_id):
         return jsonify({'success': False, 'message': 'Please login first'}), 401
     
     try:
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         # Verify the order belongs to the user and is cancellable
         cursor.execute('''
@@ -796,7 +489,7 @@ def cancel_order(order_id):
             WHERE id = %s
         ''', (order_id,))
         
-        db_commit()
+        mysql.connection.commit()
         cursor.close()
         
         logger.info(f"Order {order_id} cancelled by user {session['id']}")
@@ -820,7 +513,7 @@ def admin_dashboard():
     try:
         from datetime import datetime
         
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         # Get statistics with error handling
         cursor.execute('SELECT COUNT(*) as total_products FROM products')
@@ -886,7 +579,7 @@ def admin_dashboard():
                 u.email,
                 cal.cart_total as cart_value,
                 cal.created_at as sent_at,
-                cal.discount_offered as discount_offered,
+                15 as discount_offered,
                 cal.email_opened as opened,
                 cal.link_clicked as clicked,
                 cal.purchase_completed as converted,
@@ -943,7 +636,7 @@ def admin_products():
         flash('Access denied!', 'error')
         return redirect(url_for('index'))
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM products ORDER BY created_at DESC')
     products = cursor.fetchall()
     
@@ -965,7 +658,7 @@ def admin_view_product(product_id):
         flash('Access denied!', 'error')
         return redirect(url_for('index'))
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM products WHERE id = %s', (product_id,))
     product = cursor.fetchone()
     cursor.close()
@@ -989,7 +682,7 @@ def admin_edit_product(product_id):
         flash('Access denied!', 'error')
         return redirect(url_for('index'))
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
     if request.method == 'POST':
         # Update product
@@ -1006,7 +699,7 @@ def admin_edit_product(product_id):
                 WHERE id = %s
             ''', (name, description, price, stock, category, product_id))
             
-            db_commit()
+            mysql.connection.commit()
             cursor.close()
             
             flash('Product updated successfully!', 'success')
@@ -1042,7 +735,7 @@ def admin_delete_product(product_id):
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
     try:
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         # Check if product exists
         cursor.execute('SELECT * FROM products WHERE id = %s', (product_id,))
@@ -1077,7 +770,7 @@ def admin_delete_product(product_id):
         app.logger.info(f"Deleting product {product_id}")
         cursor.execute('DELETE FROM products WHERE id = %s', (product_id,))
         
-        db_commit()
+        mysql.connection.commit()
         cursor.close()
         
         app.logger.info(f"Successfully deleted product {product_id}")
@@ -1169,12 +862,12 @@ def admin_add_product():
                 image_filename = str(uuid.uuid4()) + '_' + filename
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], image_filename))
         
-        cursor = get_db_cursor(dict_cursor=False)
+        cursor = mysql.connection.cursor()
         cursor.execute('''
             INSERT INTO products (name, description, price, stock, category, image) 
             VALUES (%s, %s, %s, %s, %s, %s)
         ''', (name, description, price, stock, category, image_filename))
-        db_commit()
+        mysql.connection.commit()
         cursor.close()
         
         flash('Product added successfully!', 'success')
@@ -1188,7 +881,7 @@ def admin_orders():
         flash('Access denied!', 'error')
         return redirect(url_for('index'))
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('''
         SELECT o.*, u.name as user_name, u.email 
         FROM orders o 
@@ -1219,13 +912,13 @@ def update_order_status():
         if status not in valid_statuses:
             return jsonify({'success': False, 'message': 'Invalid status'}), 400
         
-        cursor = get_db_cursor(dict_cursor=False)
+        cursor = mysql.connection.cursor()
         cursor.execute('''
             UPDATE orders 
             SET status = %s, updated_at = NOW() 
             WHERE id = %s
         ''', (status, order_id))
-        db_commit()
+        mysql.connection.commit()
         cursor.close()
         
         return jsonify({'success': True, 'message': 'Order status updated successfully'})
@@ -1240,7 +933,7 @@ def order_details(order_id):
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
     try:
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         # Get order details
         cursor.execute('''
@@ -1333,7 +1026,7 @@ def print_order(order_id):
         return redirect(url_for('index'))
     
     try:
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         # Get order details
         cursor.execute('''
@@ -1372,7 +1065,7 @@ def export_orders():
         return redirect(url_for('index'))
     
     try:
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('''
             SELECT o.id, o.created_at, o.status, o.payment_status, o.total_amount,
                    u.name as user_name, u.email
@@ -1428,7 +1121,7 @@ def admin_customers():
         flash('Access denied!', 'error')
         return redirect(url_for('index'))
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('''
         SELECT u.*, 
                COUNT(DISTINCT o.id) as total_orders,
@@ -1459,7 +1152,7 @@ def customer_details(customer_id):
         return jsonify({'error': 'Access denied'}), 403
     
     try:
-        cursor = get_db_cursor(dict_cursor=True)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         # Get customer details
         cursor.execute('''
@@ -1628,7 +1321,7 @@ def admin_reports():
         flash('Access denied!', 'error')
         return redirect(url_for('index'))
     
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
     # Sales statistics
     cursor.execute('''
@@ -1704,7 +1397,7 @@ def admin_settings():
             flash('Cache cleared successfully!', 'success')
     
     # Get some basic statistics for settings page
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
     cursor.execute('SELECT COUNT(*) as count FROM products')
     product_count = cursor.fetchone()['count']
@@ -1745,7 +1438,7 @@ def test_images():
         result['product_images'] = os.listdir(images_dir)
     
     # Get sample product from database
-    cursor = get_db_cursor(dict_cursor=True)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT name, image FROM products LIMIT 1')
     sample_product = cursor.fetchone()
     cursor.close()

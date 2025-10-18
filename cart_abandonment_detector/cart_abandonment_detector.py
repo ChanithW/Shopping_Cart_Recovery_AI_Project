@@ -14,16 +14,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import MySQLdb
 import MySQLdb.cursors
-# Lazy import for sklearn - only load when recommendations are needed
-# from sklearn.feature_extraction.text import TfidfVectorizer
-# from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from openai import OpenAI
 from flask_mail import Message
 from flask import render_template_string
-from nltk.stem import PorterStemmer
-from nltk.tokenize import word_tokenize
-import re
 
 from . import config
 
@@ -68,14 +64,9 @@ class RecommendationEngine:
     """
     
     def __init__(self):
-        # Lazy import - only load sklearn when needed (during load_products)
-        self.vectorizer = None
+        self.vectorizer = TfidfVectorizer(stop_words='english')
         self.products_cache = []
         self.tfidf_matrix = None
-        
-        # Initialize stemmer
-        self.stemmer = PorterStemmer()
-        logger.info("Porter Stemmer initialized for text preprocessing")
         
         # Initialize Groq AI
         if config.GROQ_API_KEY:
@@ -88,126 +79,9 @@ class RecommendationEngine:
             self.groq_client = None
             logger.warning("Groq API key not found - AI features disabled")
     
-    def sanitize_text(self, text: str, content_type: str = "product") -> str:
-        """
-        Safe Sanitizer (Responsible AI Practice)
-        
-        Safe Sanitizer is a Responsible AI practice because it:
-        - Protects users from harmful or misleading AI outputs
-        - Prevents model errors caused by dirty or malicious input
-        - Builds trust and reliability in automated emails and recommendations
-        
-        Args:
-            text: Input text to sanitize
-            content_type: Type of content - "product" or "email"
-            
-        Returns:
-            Sanitized text
-        """
-        if not text:
-            return ""
-        
-        original_text = text
-        s = text
-        
-        # 1. Remove HTML tags
-        s = re.sub(r'<[^>]+>', ' ', s)
-        
-        # 2. Remove PII and identifiers
-        # Remove emails
-        s = re.sub(r'\b[\w\.-]+@[\w\.-]+\.\w{2,}\b', '[EMAIL_REMOVED]', s)
-        
-        # Remove URLs
-        s = re.sub(r'https?://\S+|www\.\S+', '[URL_REMOVED]', s)
-        
-        # Remove UUIDs
-        s = re.sub(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', '[ID_REMOVED]', s)
-        
-        # Remove user-like tokens: user123, uid_456, id:1234
-        s = re.sub(r'\b(?:user|uid|id|account)[_\-:]?\d+\b', '[USER_ID_REMOVED]', s, flags=re.IGNORECASE)
-        
-        # Remove long numeric sequences (likely phone numbers or IDs)
-        s = re.sub(r'\b\d{4,}\b', '[NUMBER_REMOVED]', s)
-        
-        # Remove @mentions and hashtags
-        s = re.sub(r'[@#]\w+', '', s)
-        
-        # 3. For email content, remove offensive/manipulative words
-        if content_type == "email":
-            offensive_words = [
-                r'\bregret\b', r'\bfailure\b', r'\bshame\b', r'\bstupid\b',
-                r'\bidiot\b', r'\bloser\b', r'\bpathetic\b', r'\bworthless\b',
-                r'\bmissing out\b', r'\bfomo\b', r'\blast chance\b',
-                r'\bact now or never\b', r'\bdon\'t be a fool\b',
-                r'\byou\'ll regret\b', r'\bwhat\'s wrong with you\b'
-            ]
-            
-            for pattern in offensive_words:
-                s = re.sub(pattern, '', s, flags=re.IGNORECASE)
-        
-        # 4. Remove special characters (keep alphanumeric, spaces, and basic punctuation)
-        if content_type == "product":
-            # For products, be more aggressive - remove all special chars
-            s = re.sub(r'[^a-zA-Z0-9\s]', ' ', s)
-        else:
-            # For emails, keep basic punctuation and percentage symbol
-            s = re.sub(r'[^\w\s\.,!?\-\'%$]', ' ', s)
-        
-        # 5. Collapse multiple spaces
-        s = re.sub(r'\s+', ' ', s).strip()
-        
-        # 6. Convert to lowercase (for products only, preserve case for emails)
-        if content_type == "product":
-            s = s.lower()
-        
-        # 7. Log sanitization for auditing
-        if original_text != s:
-            changes_made = []
-            if '[EMAIL_REMOVED]' in s:
-                changes_made.append('email')
-            if '[URL_REMOVED]' in s:
-                changes_made.append('url')
-            if '[ID_REMOVED]' in s or '[USER_ID_REMOVED]' in s or '[NUMBER_REMOVED]' in s:
-                changes_made.append('identifiers')
-            if re.search(r'<[^>]+>', original_text):
-                changes_made.append('html_tags')
-            
-            logger.info(f"[SAFE_SANITIZER] {content_type.upper()} text sanitized. Removed: {', '.join(changes_made) if changes_made else 'special_chars'}")
-            logger.debug(f"[SAFE_SANITIZER] Original length: {len(original_text)}, Sanitized length: {len(s)}")
-        
-        # Remove placeholder markers for product descriptions
-        if content_type == "product":
-            s = s.replace('[email_removed]', '').replace('[url_removed]', '').replace('[id_removed]', '').replace('[user_id_removed]', '').replace('[number_removed]', '')
-            s = re.sub(r'\s+', ' ', s).strip()
-        
-        return s
-    
-    def stem_text(self, text: str) -> str:
-        """
-        Apply stemming to text for better TF-IDF matching.
-        Converts words to their root form (e.g., 'running' -> 'run')
-        
-        Args:
-            text: Input text to stem
-            
-        Returns:
-            Stemmed text
-        """
-        # Convert to lowercase and remove special characters
-        text = re.sub(r'[^a-zA-Z0-9\s]', ' ', text.lower())
-        
-        # Tokenize and stem each word
-        words = text.split()
-        stemmed_words = [self.stemmer.stem(word) for word in words if word]
-        
-        return ' '.join(stemmed_words)
-    
     def load_products(self):
         """Load all products from database and build TF-IDF matrix"""
         try:
-            # Lazy import sklearn only when needed
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            
             conn = DatabaseConnection.get_connection()
             cursor = conn.cursor()
             
@@ -229,7 +103,6 @@ class RecommendationEngine:
             # Build TF-IDF matrix from product descriptions, names, and categories
             # Handle cases where description might be NULL or empty
             product_texts = []
-            sanitized_count = 0
             for p in self.products_cache:
                 desc = p.get('description') or ''
                 cat = p.get('category') or 'general'
@@ -237,19 +110,7 @@ class RecommendationEngine:
                 # Repeat category 4x and name 3x to SIGNIFICANTLY boost their TF-IDF importance
                 # This ensures category gets very high weight and reduces false positives from word coincidences
                 text = f"{name} {name} {name} {cat} {cat} {cat} {cat} {desc}"
-                
-                # SAFE SANITIZER: Clean product text before stemming and TF-IDF
-                # Step 1: Sanitize (remove HTML, PII, special chars)
-                sanitized_text = self.sanitize_text(text, content_type="product")
-                if sanitized_text != text.lower().strip():
-                    sanitized_count += 1
-                
-                # Step 2: Apply stemming to normalized word forms
-                stemmed_text = self.stem_text(sanitized_text)
-                product_texts.append(stemmed_text)
-            
-            logger.info(f"[SAFE_SANITIZER] Sanitized {sanitized_count}/{len(product_texts)} product descriptions")
-            logger.info(f"Applied stemming to {len(product_texts)} product descriptions")
+                product_texts.append(text)
             
             # Use min_df=1 to include all terms, even if they appear in only one document
             self.vectorizer = TfidfVectorizer(
@@ -267,12 +128,7 @@ class RecommendationEngine:
     
     def get_similar_products(self, cart_items: List[Dict], count: int = 3) -> List[Dict]:
         """
-        Find similar products based on cart items using PER-ITEM TF-IDF + Cosine Similarity
-        
-        NEW STRATEGY:
-        - Generate recommendations for EACH cart item separately
-        - This prevents mixing laptop with chair recommendations
-        - Intelligently combine and rank results
+        Find similar products based on cart items using TF-IDF + Cosine Similarity
         
         Args:
             cart_items: List of items currently in cart
@@ -288,123 +144,85 @@ class RecommendationEngine:
             return []
         
         try:
-            # Lazy import sklearn only when needed
-            from sklearn.metrics.pairwise import cosine_similarity
-            
             # Get cart product IDs to exclude from recommendations
             cart_product_ids = {item['product_id'] for item in cart_items}
             
-            # NEW: Generate recommendations PER cart item (not averaged)
-            all_recommendations = {}  # product_id -> (product, max_score, source_item)
+            # Build query from cart items (with better text extraction)
+            cart_texts = []
+            for item in cart_items:
+                name = item.get('name', '')
+                cat = item.get('category', '')
+                desc = item.get('description', '')
+                # Repeat category 4x and name 3x to match product weighting
+                # This ensures better category-based matching and fewer false positives
+                cart_texts.append(f"{name} {name} {name} {cat} {cat} {cat} {cat} {desc}")
             
-            for cart_item in cart_items:
-                # Build query for THIS specific cart item
-                name = cart_item.get('name', '')
-                cat = cart_item.get('category', '')
-                desc = cart_item.get('description', '')
-                
-                # Repeat category 4x and name 3x for better matching
-                item_text = f"{name} {name} {name} {cat} {cat} {cat} {cat} {desc}"
-                
-                # SAFE SANITIZER: Clean cart item text (same pipeline as products)
-                # Step 1: Sanitize
-                sanitized_item_text = self.sanitize_text(item_text, content_type="product")
-                
-                # Step 2: Apply stemming to cart item (same as products)
-                stemmed_item_text = self.stem_text(sanitized_item_text)
-                
-                # Transform to TF-IDF vector
-                item_vector = self.vectorizer.transform([stemmed_item_text])
-                
-                # Calculate similarity for this specific item
-                item_similarities = cosine_similarity(item_vector, self.tfidf_matrix)[0]
-                
-                # Get category of current cart item
-                cart_item_category = (cat or '').strip().lower()
-                
-                # Find top matches for THIS item
-                for idx in np.argsort(item_similarities)[::-1][:count * 2]:  # Get extra candidates
-                    product = self.products_cache[idx]
-                    product_id = product['id']
-                    
-                    # Skip if already in cart
-                    if product_id in cart_product_ids:
-                        continue
-                    
+            cart_text = " ".join(cart_texts)
+            
+            # Transform cart text to TF-IDF vector
+            cart_vector = self.vectorizer.transform([cart_text])
+            
+            # Calculate cosine similarity
+            similarities = cosine_similarity(cart_vector, self.tfidf_matrix)[0]
+            
+            # Extract categories from cart items for category-based filtering
+            cart_categories = set()
+            for item in cart_items:
+                cat = item.get('category', '').strip()
+                if cat:
+                    cart_categories.add(cat.lower())
+            
+            # Get top similar products (excluding cart items)
+            # Prioritize products from same categories to reduce false positives
+            similar_indices = []
+            same_category_matches = []
+            cross_category_matches = []
+            
+            for idx in np.argsort(similarities)[::-1]:
+                product = self.products_cache[idx]
+                if product['id'] not in cart_product_ids:
                     product_cat = (product.get('category') or '').strip().lower()
-                    similarity_score = item_similarities[idx]
+                    similarity_score = similarities[idx]
                     
-                    # STRONG CATEGORY FILTERING: Only recommend same-category products
-                    # This prevents iPhone recommendations for laptop carts!
-                    if cart_item_category and product_cat:
-                        if cart_item_category != product_cat:
-                            # Different category - skip unless very high similarity
-                            if similarity_score < 0.5:  # Much stricter threshold
-                                continue
-                            else:
-                                # Penalize cross-category matches heavily
-                                similarity_score *= 0.3
-                    
-                    # Boost same-category matches
-                    if cart_item_category and product_cat == cart_item_category:
-                        similarity_score *= 1.5  # 50% boost for exact category match
-                    
-                    # Track best score for each product
-                    if product_id not in all_recommendations or similarity_score > all_recommendations[product_id][1]:
-                        all_recommendations[product_id] = (product, similarity_score, cart_item.get('name', 'Unknown'), cart_item_category)
+                    # Boost score for same-category products (reduce false positives)
+                    if product_cat in cart_categories:
+                        # Same category gets priority
+                        same_category_matches.append((idx, similarity_score * 1.3))  # 30% boost
+                    else:
+                        # Cross-category matches (like "Air" Fryer for "Air" Jordan)
+                        # Only include if similarity is strong enough
+                        if similarity_score > 0.25:  # Higher threshold for cross-category
+                            cross_category_matches.append((idx, similarity_score))
             
-            # TOP RECOMMENDATIONS: Get products with highest cosine similarity scores
-            # Sort all recommendations by similarity score (descending)
-            sorted_recommendations = sorted(
-                all_recommendations.items(),
-                key=lambda x: x[1][1],  # Sort by similarity_score
-                reverse=True
-            )
+            # Combine: prioritize same-category, then high-scoring cross-category
+            similar_indices = sorted(same_category_matches, key=lambda x: x[1], reverse=True)[:count]
             
-            logger.info(f"Found {len(sorted_recommendations)} similar products, selecting top {count} by cosine similarity")
+            # Fill remaining slots with cross-category if needed
+            if len(similar_indices) < count:
+                remaining = count - len(similar_indices)
+                cross_category_sorted = sorted(cross_category_matches, key=lambda x: x[1], reverse=True)
+                similar_indices.extend(cross_category_sorted[:remaining])
             
-            # Build recommendation list with top N highest scores
-            recommendations = []
-            for product_id, (product, similarity_score, source_item, source_category) in sorted_recommendations[:count]:
-                product_copy = product.copy()
-                product_copy['similarity_score'] = float(similarity_score)
-                product_copy['recommended_because_of'] = source_item
-                product_copy['url'] = f"{config.BASE_URL}/product/{product['id']}"
-                recommendations.append(product_copy)
-                logger.info(f"  - {product['name'][:40]:40s} (score: {similarity_score:.4f}, source: {source_item[:30]})")
-            
-            # If we don't have enough recommendations, add category-matched products
-            if len(recommendations) < count:
-                logger.info(f"Only found {len(recommendations)} similar products, adding category-matched products")
-                
-                # Get all categories from cart
-                cart_categories = {(item.get('category') or '').strip().lower() for item in cart_items if item.get('category')}
-                
-                for product in self.products_cache:
-                    if product['id'] not in cart_product_ids and product['id'] not in all_recommendations:
-                        product_cat = (product.get('category') or '').strip().lower()
-                        
-                        # Add if same category as any cart item
-                        if product_cat in cart_categories:
-                            product_copy = product.copy()
-                            product_copy['similarity_score'] = 0.3  # Lower score for category-only match
-                            product_copy['recommended_because_of'] = f"Same category ({product_cat})"
-                            product_copy['url'] = f"{config.BASE_URL}/product/{product['id']}"
-                            recommendations.append(product_copy)
-                            
-                            if len(recommendations) >= count:
+            # If we don't have enough recommendations, add top-rated/recent products
+            if len(similar_indices) < count:
+                logger.warning(f"Only found {len(similar_indices)} similar products, adding top products")
+                for idx, product in enumerate(self.products_cache):
+                    if product['id'] not in cart_product_ids:
+                        # Check if not already added
+                        if not any(i == idx for i, _ in similar_indices):
+                            similar_indices.append((idx, 0.5))  # Give neutral similarity
+                            if len(similar_indices) >= count:
                                 break
             
-            logger.info(f"Generated {len(recommendations)} recommendations using per-item TF-IDF strategy with balanced categories")
-            if recommendations:
-                logger.info(f"Top recommendation: {recommendations[0].get('name')} (score: {recommendations[0].get('similarity_score'):.3f}, because of: {recommendations[0].get('recommended_because_of')})")
-                # Log category breakdown
-                rec_categories = {}
-                for rec in recommendations:
-                    cat = (rec.get('category') or 'Unknown').strip()
-                    rec_categories[cat] = rec_categories.get(cat, 0) + 1
-                logger.info(f"Recommendation categories: {rec_categories}")
+            # Build recommendation list
+            recommendations = []
+            for idx, similarity_score in similar_indices:
+                product = self.products_cache[idx].copy()
+                product['similarity_score'] = float(similarity_score)
+                product['url'] = f"{config.BASE_URL}/product/{product['id']}"
+                recommendations.append(product)
             
+            logger.info(f"Generated {len(recommendations)} recommendations (TF-IDF similarity)")
             return recommendations
             
         except Exception as e:
@@ -446,111 +264,74 @@ class RecommendationEngine:
                 for item in cart_items
             ])
             
-            # Sample 1-3 recommendations to highlight (creates variety per email)
-            import random
-            if recommendations:
-                sample_size = min(len(recommendations), random.randint(1, 3))
-                highlighted_recs = random.sample(recommendations, sample_size)
-                recs_summary = "\n".join([
-                    f"- {p['name']}: {p.get('description', 'Great product')[:80]}... (${p['price']:.2f})"
-                    for p in highlighted_recs
-                ])
-            else:
-                recs_summary = "No specific recommendations available"
+            # Build recommendations summary
+            recs_summary = "\n".join([
+                f"- {p['name']}: {p.get('description', 'Great product')[:80]}... (${p['price']:.2f})"
+                for p in recommendations
+            ]) if recommendations else "No specific recommendations available"
             
-            # Randomize prompt structure for variety - injects randomness without hardcoded content
-            tones = [
-                "friendly and enthusiastic",
-                "warm and helpful",
-                "casual and conversational",
-                "excited and upbeat"
-            ]
-            
-            approaches = [
-                "Start by mentioning their cart items, then introduce the discount and recommendations naturally",
-                "Lead with the special discount offer, then highlight what's in their cart and suggested items",
-                "Begin with a warm greeting about their selections, weave in the discount and recommendations organically",
-                "Open with excitement about their cart choices, then present the offer and complementary products"
-            ]
-            
-            style_variations = [
-                "Use short, punchy sentences and varied structure",
-                "Mix longer descriptive sentences with brief action-oriented ones",
-                "Blend questions with statements to create engagement",
-                "Use conversational fragments alongside complete sentences for natural flow"
-            ]
-            
-            tone = random.choice(tones)
-            approach = random.choice(approaches)
-            style = random.choice(style_variations)
-            
-            # Less prescriptive prompt - lets Groq be more creative
             prompt = f"""
-Write a personalized cart recovery email for {user_name}.
+            You are writing a friendly, personalized cart abandonment email for {user_name}.
 
-Cart contents (${cart_total:.2f}):
-{cart_summary}
+            THEIR CART (${cart_total:.2f} total):
+            {cart_summary}
 
-Special offer: {discount_percent}% discount
+            SPECIAL OFFER: {discount_percent}% OFF their entire order!
 
-Suggested complementary products:
-{recs_summary}
+            RECOMMENDED PRODUCTS to complement their cart:
+            {recs_summary}
 
-Tone: {tone}
-Approach: {approach}
-Style: {style}
+            Write a warm, engaging message that:
+            1. Acknowledges what's in their cart specifically (mention product names and quantities)
+            2. Highlights the {discount_percent}% discount they're getting
+            3. Explains how the recommended products complement what they're already buying
+            4. Creates urgency without being pushy
+            5. Encourages them to complete their purchase
 
-Requirements:
-- Mention 1-2 cart items by name naturally in conversation
-- Work in the {discount_percent}% discount smoothly (don't make it the only focus)
-- Suggest how 1-2 recommended products complement their selections
-- Create subtle urgency through scarcity or time sensitivity
-- Keep under 150 words
-- No signatures, closings, or "Best regards" type phrases
-- Optional: 1-2 tasteful emojis for personality
+            Guidelines:
+            - Be conversational and personal (use "you" and "your")
+            - Add a small touch of excitement (like “Your favorites are waiting!”)
+            - Optionally add a short emoji or two for personality, but keep it professional (e.g., 🛍, ❤, ✨)
+            - Highlight urgency subtly , mention the available quantity
 
-Write the email body now:
-"""
+            - Keep it under 150 words
+            - Focus on value and benefits
+            - Don't use overly salesy language
             
-            # Log prompt for debugging with randomization details
-            logger.info(f"Sending prompt to Groq (length: {len(prompt)} chars, tone={tone}, approach={approach[:50]}...)")
+            CRITICAL: DO NOT INCLUDE ANY SIGNATURES OR CLOSINGS
+            - No "Best regards", "Sincerely", "Cheers"
+            - No "Best, [Your Name]" or placeholder names
+            - No "Thank you", "Regards", etc.
+            - Just the main message body - no closing phrases
+
+            Write the message now:
+            """
+            
+            # Log prompt for debugging
+            logger.info(f"Sending prompt to Groq (length: {len(prompt)} chars)")
             logger.debug(f"Prompt: {prompt[:500]}...")
             
-            # Call Groq API with increased diversity parameters to reduce repetition
+            # Call Groq API
             response = await asyncio.to_thread(
                 self.groq_client.chat.completions.create,
                 model=config.GROQ_MODEL,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a creative marketing assistant writing personalized cart abandonment emails. Be warm, conversational, and exciting without being pushy. Vary your writing style and avoid repetitive patterns."
+                        "content": "You are a friendly marketing assistant writing personalized cart abandonment emails. Be warm, conversational, and exciting without being pushy."
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                temperature=0.85,  # Increased from 0.7 for more creativity
+                temperature=config.GROQ_TEMPERATURE,
                 max_tokens=config.GROQ_MAX_TOKENS,
-                top_p=0.9,
-                presence_penalty=0.4,  # Encourage new topics and varied vocabulary
-                frequency_penalty=0.4  # Discourage repetitive phrases and patterns
+                top_p=0.9
             )
             
             # Extract content from response
             ai_text = response.choices[0].message.content.strip()
-            
-            logger.info(f"[AI_OUTPUT] Groq generated {len(ai_text)} chars before sanitization")
-            
-            # SAFE SANITIZER: Clean AI-generated email content
-            # This protects users from harmful, manipulative, or offensive content
-            ai_text_original = ai_text
-            ai_text = self.sanitize_text(ai_text, content_type="email")
-            
-            if ai_text != ai_text_original:
-                logger.warning(f"[SAFE_SANITIZER] AI email content was sanitized for safety")
-                logger.debug(f"[SAFE_SANITIZER] Original AI text: {ai_text_original[:200]}...")
-                logger.debug(f"[SAFE_SANITIZER] Sanitized AI text: {ai_text[:200]}...")
             
             # Post-processing: Remove any signatures the AI might still add
             import re
@@ -668,15 +449,10 @@ class EmailService:
             discount_percent, discount_message = self.calculate_discount(cart_total)
             discounted_total = cart_total * (1 - discount_percent / 100)
             
-            # Fixed count: Top 3 products with highest cosine similarity
-            recommendation_count = 3
-            
-            logger.info(f"Cart size: {len(cart_items)} items → Generating top {recommendation_count} recommendations by cosine similarity")
-            
-            # Get product recommendations (top 3 highest similarity scores)
+            # Get product recommendations
             recommendations = self.recommendation_engine.get_similar_products(
                 cart_items,
-                count=recommendation_count
+                count=config.RECOMMENDATION_COUNT
             )
             
             # Generate AI-enhanced personalized email content with cart items and discount info
@@ -698,7 +474,7 @@ class EmailService:
             tracking_cart_url = config.CART_URL
             if log_id:
                 separator = '&' if '?' in tracking_cart_url else '?'
-                tracking_cart_url = f"{tracking_cart_url}{separator}email_track={log_id}&discount={discount_percent}&source=abandonment_email"
+                tracking_cart_url = f"{tracking_cart_url}{separator}email_track={log_id}&source=abandonment_email"
             
             # Build complete email HTML
             email_html = self._build_email_html(
@@ -1278,39 +1054,29 @@ class CartAbandonmentDetector:
             # Calculate abandonment threshold
             threshold_time = datetime.now() - timedelta(minutes=config.ABANDONMENT_THRESHOLD_MINUTES)
             
-            logger.info(f"🔍 Checking for abandoned carts (threshold: {threshold_time})")
-            
-            # Find abandoned carts - check USER IDLE TIME instead of cart age
-            # This prevents false positives (emails to active users)
+            # Find abandoned carts - get unique users with abandoned items
             query = """
                 SELECT 
                     c.user_id,
                     MIN(c.created_at) as created_at,
                     u.name,
-                    u.email,
-                    u.last_activity
+                    u.email
                 FROM cart c
                 JOIN users u ON c.user_id = u.id
-                WHERE u.last_activity <= %s
-                AND u.last_activity IS NOT NULL
+                WHERE c.created_at <= %s
                 AND c.user_id NOT IN (
                     SELECT DISTINCT user_id 
                     FROM orders 
                     WHERE created_at > %s
                 )
-                GROUP BY c.user_id, u.name, u.email, u.last_activity
+                GROUP BY c.user_id, u.name, u.email
                 HAVING COUNT(*) > 0
             """
             
             cursor.execute(query, (threshold_time, threshold_time))
             abandoned_carts = cursor.fetchall()
             
-            logger.info(f"📊 Found {len(abandoned_carts)} truly IDLE carts (last_activity < {threshold_time})")
-            
-            # Log each cart for debugging
-            for cart_info in abandoned_carts:
-                idle_time = datetime.now() - cart_info['last_activity']
-                logger.info(f"   🚨 User {cart_info['user_id']} ({cart_info['name']}): idle for {idle_time.total_seconds():.0f}s")
+            logger.info(f"Found {len(abandoned_carts)} potentially abandoned carts")
             
             for cart_info in abandoned_carts:
                 # Get cart details first to generate hash
@@ -1378,17 +1144,14 @@ class CartAbandonmentDetector:
                 # Calculate total
                 cart_total = sum(float(item['total']) for item in cart_items)
                 
-                # Calculate discount for this cart
-                discount_percent, _ = self.email_service.calculate_discount(cart_total)
-                
                 # Prepare user info
                 user = {
                     'name': cart_info['name'],
                     'email': cart_info['email']
                 }
                 
-                # Log to database first to get the log_id for tracking (include discount)
-                log_id = self._log_abandonment_event(cursor, cart_info['user_id'], cart_hash, cart_total, email_sent=False, discount_percent=discount_percent)
+                # Log to database first to get the log_id for tracking
+                log_id = self._log_abandonment_event(cursor, cart_info['user_id'], cart_hash, cart_total, email_sent=False)
                 
                 # Generate and send email with tracking log_id
                 try:
@@ -1432,21 +1195,21 @@ class CartAbandonmentDetector:
         except Exception as e:
             logger.error(f"Error checking abandoned carts: {e}")
     
-    def _log_abandonment_event(self, cursor, user_id: int, cart_hash: str, cart_total: float, email_sent: bool, discount_percent: float = 0):
+    def _log_abandonment_event(self, cursor, user_id: int, cart_hash: str, cart_total: float, email_sent: bool):
         """Log abandonment event to database with cart hash for duplicate prevention"""
         try:
-            # Insert log entry with cart hash and discount percentage
+            # Insert log entry with cart hash
             # The duplicate check is now done before calling this function
             cursor.execute("""
-                INSERT INTO cart_abandonment_log (user_id, cart_hash, cart_total, email_sent, discount_offered)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, cart_hash, cart_total, email_sent, discount_percent))
+                INSERT INTO cart_abandonment_log (user_id, cart_hash, cart_total, email_sent)
+                VALUES (%s, %s, %s, %s)
+            """, (user_id, cart_hash, cart_total, email_sent))
             
             cursor.connection.commit()
             
             # Get the inserted ID
             log_id = cursor.lastrowid
-            logger.info(f"Logged abandonment event: user_id={user_id}, cart_hash={cart_hash[:8]}..., discount={discount_percent}%, log_id={log_id}")
+            logger.info(f"Logged abandonment event: user_id={user_id}, cart_hash={cart_hash[:8]}..., log_id={log_id}")
             return log_id
             
         except Exception as e:
