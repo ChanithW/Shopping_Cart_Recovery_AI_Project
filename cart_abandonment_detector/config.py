@@ -18,7 +18,8 @@ DISCOUNT_TIER_2_AMOUNT = 500  # $500+ get 20% discounts
 DISCOUNT_TIER_2_PERCENT = 20
 
 # Free shippings for all abandoned carts
-FREE_SHIPPING_ENABLED = True
+FREE_SHIPPING_ENABLED = True 
+
 
 # Email Settings
 SENDER_EMAIL = os.getenv('MAIL_USERNAME', 'noreply@ecommerce.com')
