@@ -105,12 +105,6 @@ Total:        $450.00
    - Stores discount in session for persistence
    - Cart page shows discount breakdown
 
-4. **Cart Page Display**
-   ```
-   Subtotal:        $1,000.00
-   Shipping:        Free
-   Discount (20%):  -$200.00
-   ─────────────────────────
-   Total:           $800.00
+
    ```
 
