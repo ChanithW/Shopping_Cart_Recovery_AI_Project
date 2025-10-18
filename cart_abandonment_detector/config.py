@@ -14,7 +14,7 @@ CHECK_INTERVAL_SECONDS = 30  # Check every 30 seconds
 DISCOUNT_TIER_1_AMOUNT = 100  # $100+ gets 10% discount
 DISCOUNT_TIER_1_PERCENT = 10
 
-DISCOUNT_TIER_2_AMOUNT = 500  # $500+ get 20% discount
+DISCOUNT_TIER_2_AMOUNT = 500  # $500+ get 20% discounts
 DISCOUNT_TIER_2_PERCENT = 20
 
 # Free shippings for all abandoned carts
