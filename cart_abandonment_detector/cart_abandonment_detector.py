@@ -827,7 +827,7 @@ class EmailService:
         recs_text = ""
         if kwargs['recommendations']:
             recs_text = "\n\nYOU MIGHT ALSO LOVE:\n" + "\n".join([
-                f"  - {p['name']} (${p['price']:.2f}) - {kwargs['cart_url'].replace('/cart', f'/product/{p['id']}')}"
+                f"  - {p['name']} (${p['price']:.2f}) - {kwargs['cart_url'].replace('/cart', '/product/' + str(p['id']))}"
                 for p in kwargs['recommendations']
             ])
         

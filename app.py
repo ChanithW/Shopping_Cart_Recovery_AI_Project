@@ -20,19 +20,19 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '6c8e6b5a7f29d34e8a2f47c19d7c
 # Disable template caching for development
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
-app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
-app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '')
-app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'ecommerce')
+app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST') or 'localhost'
+app.config['MYSQL_USER'] = os.getenv('MYSQL_USER') or 'root'
+app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD') or ''
+app.config['MYSQL_DB'] = os.getenv('MYSQL_DB') or 'ecommerce'
 
 # Email configuration
-app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', '587'))
-app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True').lower() == 'true'
-app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', 'False').lower() == 'true'
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER') or 'smtp.gmail.com'
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT') or 587)
+app.config['MAIL_USE_TLS'] = (os.getenv('MAIL_USE_TLS') or 'True').lower() == 'true'
+app.config['MAIL_USE_SSL'] = (os.getenv('MAIL_USE_SSL') or 'False').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME') or ''
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD') or ''
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER') or app.config['MAIL_USERNAME']
 
 # File upload configuration
 app.config['UPLOAD_FOLDER'] = 'static/images/products'
