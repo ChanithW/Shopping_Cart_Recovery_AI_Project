@@ -17,7 +17,7 @@ DISCOUNT_TIER_1_PERCENT = 10
 DISCOUNT_TIER_2_AMOUNT = 500  # $500+ get 20% discount
 DISCOUNT_TIER_2_PERCENT = 20
 
-# Free shipping for all abandoned carts
+# Free shippings for all abandoned carts
 FREE_SHIPPING_ENABLED = True
 
 # Email Settings
