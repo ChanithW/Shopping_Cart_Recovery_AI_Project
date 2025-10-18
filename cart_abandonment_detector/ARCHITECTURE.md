@@ -461,35 +461,7 @@ SELECT
     COUNT(*) as count
 FROM cart_abandonment_log
 GROUP BY tier;
-```
+``'
 
-## Future Enhancements
 
-### Phase 2 Ideas
-
-1. **Multi-stage campaigns:**
-   - First email: 1 hour after abandonment (no discount)
-   - Second email: 24 hours (10% discount)
-   - Third email: 72 hours (20% discount)
-
-2. **A/B testing:**
-   - Different subject lines
-   - Different discount tiers
-   - Different recommendation counts
-
-3. **Personalization:**
-   - User purchase history analysis
-   - Category preferences
-   - Price sensitivity modeling
-
-4. **Analytics dashboard:**
-   - Real-time abandonment metrics
-   - Recovery rate tracking
-   - Revenue impact calculation
-
-5. **SMS notifications:**
-   - For high-value carts
-   - Quick recovery links
-
-## Architecture Benefits
 
