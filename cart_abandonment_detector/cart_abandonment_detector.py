@@ -359,7 +359,7 @@ class RecommendationEngine:
                     logger.info(f"Removed signature with pattern: {pattern}")
             
             ai_text = ai_text.strip()
-            logger.debug(f"AI text after signature removal: {repr(ai_text)}")
+            logger.debug(f"AI text after signature removals: {repr(ai_text)}")
             
             logger.info(f"✅ Groq AI generated personalized content ({len(ai_text)} chars)")
             logger.info(f"Finish reason: {response.choices[0].finish_reason}")
