@@ -130,13 +130,3 @@ Total:        $450.00
 - `session['discount_percent']`: Discount percentage (e.g., 20)
 - `session['discount_log_id']`: Cart abandonment log ID for conversion tracking
 
-**Lifecycle**:
-- **Set**: When user clicks email link in `/cart` route
-- **Used**: In `/cart` and `/checkout` routes
-- **Cleared**: After successful order placement
-
-## Database Schema
-
-
-
-
