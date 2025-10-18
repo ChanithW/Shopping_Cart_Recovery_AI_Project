@@ -137,26 +137,6 @@ Total:        $450.00
 
 ## Database Schema
 
-### cart_abandonment_log Table
-```sql
-CREATE TABLE cart_abandonment_log (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  cart_hash VARCHAR(64),
-  cart_total DECIMAL(10,2),
-  discount_offered DECIMAL(5,2) DEFAULT 0,  -- NEW COLUMN
-  email_sent BOOLEAN DEFAULT FALSE,
-  email_opened BOOLEAN DEFAULT FALSE,
-  link_clicked BOOLEAN DEFAULT FALSE,
-  purchase_completed BOOLEAN DEFAULT FALSE,
-  opened_at TIMESTAMP NULL,
-  clicked_at TIMESTAMP NULL,
-  completed_at TIMESTAMP NULL,
-  click_count INT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
 
 
 
