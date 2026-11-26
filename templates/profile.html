@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - {{ user.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Your Profile</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> {{ user.name }}</p>
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    {% if user.phone %}
+                    <p><strong>Phone:</strong> {{ user.phone }}</p>
+                    {% endif %}
+                    {% if user.address %}
+                    <p><strong>Address:</strong> {{ user.address }}</p>
+                    {% endif %}
+                    {% if user.created_at %}
+                    <p><strong>Member Since:</strong> {{ user.created_at }}</p>
+                    {% endif %}
+
+                                        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+                                        <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+
+                                        <!-- Delete Account Button (opens confirmation modal) -->
+                                        <button id="deleteAccountBtn" type="button" class="btn btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#deleteAccountModal">
+                                            Delete Account
+                                        </button>
+
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Delete Confirmation Modal (placed inside content) -->
+<div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-labelledby="deleteAccountModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteAccountModalLabel">Confirm Account Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to permanently delete your account? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+
+                <form method="post" action="{{ url_for('delete_account') }}" style="display:inline;">
+                    <button type="submit" class="btn btn-danger">Yes, delete my account</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    // Fallback: if data-bs attributes fail, programmatically show the modal
+    var deleteBtn = document.getElementById('deleteAccountBtn');
+    if(deleteBtn){
+        deleteBtn.addEventListener('click', function(e){
+            try{
+                var modalEl = document.getElementById('deleteAccountModal');
+                if(modalEl && typeof bootstrap !== 'undefined'){
+                    var modal = new bootstrap.Modal(modalEl);
+                    modal.show();
+                }
+            }catch(err){
+                console.error('Failed to open delete account modal', err);
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
